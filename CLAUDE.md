@@ -229,3 +229,302 @@ Add to `ALLOWED_COMMANDS` in `security.py`. If the command needs extra validatio
 
 ### Modifying the app specification
 Edit `specs/app_spec.txt` or create a new spec in `specs/`. The default spec is copied into the project directory on first run.
+
+## Agent Status Dashboard
+
+The Agent Status Dashboard is a comprehensive metrics instrumentation system that tracks agent sessions, delegations, token usage, costs, and performance characteristics. It provides visibility into agent behavior across autonomous engineering tasks.
+
+### Overview
+
+The dashboard tracks:
+- **Session metrics**: Each autonomous engineering session (initializer or continuation) with start/end times, agents involved, and tickets addressed
+- **Agent delegations**: Individual invocations to agents (coding, github, linear, slack, etc.) with token counts and costs
+- **Token usage**: Per-event and per-agent aggregates, supporting cost tracking at current Claude pricing
+- **Artifacts**: What each agent produced (commits, PRs, files, issues, etc.)
+- **Gamification**: XP, levels, achievement badges, and success streaks for agents
+- **Performance analysis**: Strengths/weaknesses detection and rolling window statistics
+
+### Data Model
+
+The dashboard uses TypedDict types defined in `metrics.py`:
+
+**AgentEvent** - Single agent invocation record:
+```python
+{
+    "event_id": str,                      # UUID for this event
+    "agent_name": str,                    # "coding", "github", "linear", "slack", etc.
+    "session_id": str,                    # Parent session ID
+    "ticket_key": str,                    # Linear ticket key (e.g., "AI-50")
+    "started_at": str,                    # ISO 8601 timestamp
+    "ended_at": str,                      # ISO 8601 timestamp
+    "duration_seconds": float,            # Execution time
+    "status": str,                        # "success", "error", "timeout", "blocked"
+    "input_tokens": int,                  # Tokens in prompt
+    "output_tokens": int,                 # Tokens generated
+    "total_tokens": int,                  # Sum of input + output
+    "estimated_cost_usd": float,          # Cost based on model pricing
+    "artifacts": list[str],               # ["commit:abc123", "pr:#42", "file:src/foo.py", "issue:AI-12"]
+    "error_message": str,                 # Details if status is "error"
+    "model_used": str,                    # "claude-haiku-4-5", "claude-sonnet-4-5", etc.
+}
+```
+
+**AgentProfile** - Cumulative statistics for one agent:
+```python
+{
+    "agent_name": str,
+    # Counters
+    "total_invocations": int,
+    "successful_invocations": int,
+    "failed_invocations": int,
+    "total_tokens": int,
+    "total_cost_usd": float,
+    "total_duration_seconds": float,
+    # Artifacts
+    "commits_made": int,
+    "prs_created": int,
+    "prs_merged": int,
+    "files_created": int,
+    "files_modified": int,
+    "lines_added": int,
+    "lines_removed": int,
+    "tests_written": int,
+    "issues_created": int,
+    "issues_completed": int,
+    "messages_sent": int,
+    "reviews_completed": int,
+    # Derived metrics
+    "success_rate": float,                # 0.0 to 1.0
+    "avg_duration_seconds": float,
+    "avg_tokens_per_call": float,
+    "cost_per_success_usd": float,
+    # Gamification
+    "xp": int,                            # Experience points
+    "level": int,                         # Current level
+    "current_streak": int,                # Consecutive successes
+    "best_streak": int,                   # Peak streak
+    "achievements": list[str],            # ["first_blood", "century_club", ...]
+    # Analysis
+    "strengths": list[str],               # ["fast_execution", "high_success_rate", "low_cost"]
+    "weaknesses": list[str],              # ["high_error_rate", "slow", "expensive"]
+    "recent_events": list[str],           # Last 20 event IDs
+    "last_error": str,
+    "last_active": str,                   # ISO 8601 timestamp
+}
+```
+
+**SessionSummary** - Rollup metrics for entire session:
+```python
+{
+    "session_id": str,
+    "session_number": int,                # Sequential number within project
+    "session_type": str,                  # "initializer" or "continuation"
+    "started_at": str,
+    "ended_at": str,
+    "status": str,                        # "continue", "error", "complete"
+    "agents_invoked": list[str],          # Agents used in session
+    "total_tokens": int,
+    "total_cost_usd": float,
+    "tickets_worked": list[str],          # Tickets addressed
+}
+```
+
+**DashboardState** - Root structure in `.agent_metrics.json`:
+```python
+{
+    "version": int,                       # Schema version (currently 1)
+    "project_name": str,
+    "created_at": str,
+    "updated_at": str,
+    "total_sessions": int,
+    "total_tokens": int,
+    "total_cost_usd": float,
+    "total_duration_seconds": float,
+    "agents": dict[str, AgentProfile],   # Per-agent profiles
+    "events": list[AgentEvent],          # Capped at 500 (FIFO eviction)
+    "sessions": list[SessionSummary],    # Capped at 50 (FIFO eviction)
+}
+```
+
+### Core Components
+
+**AgentMetricsCollector** (`agent_metrics_collector.py`):
+Main class for tracking agent delegations. Manages session lifecycle and provides the `track_agent()` context manager.
+
+**MetricsStore** (`metrics_store.py`):
+JSON persistence layer for `.agent_metrics.json`. Handles atomic writes, corruption recovery, cross-process locking, and FIFO eviction.
+
+**strengths_weaknesses.py**:
+Auto-detection of agent performance characteristics using rolling window statistics. Identifies patterns like "fast_execution", "high_success_rate", "expensive", etc.
+
+**achievements.py**:
+Gamification system with 12 achievement types (first_blood, century_club, perfect_day, speed_demon, comeback_kid, big_spender, penny_pincher, marathon, polyglot, night_owl, streak_10, streak_25).
+
+### Usage Examples
+
+**Basic Session Tracking**:
+```python
+from agent_metrics_collector import AgentMetricsCollector
+
+# Initialize collector
+collector = AgentMetricsCollector(project_name="my-project")
+
+# Start a session
+session_id = collector.start_session(session_type="initializer")
+
+# Track an agent delegation
+with collector.track_agent("coding", "AI-50", "claude-sonnet-4-5", session_id) as tracker:
+    # Do work...
+    tracker.add_tokens(input_tokens=2000, output_tokens=3000)
+    tracker.add_artifact("file:created:src/agent.py")
+    tracker.add_artifact("file:created:test_agent.py")
+
+# Track another agent in the same session
+with collector.track_agent("github", "AI-50", "claude-haiku-4-5", session_id) as tracker:
+    tracker.add_tokens(input_tokens=500, output_tokens=1200)
+    tracker.add_artifact("pr:created:#42")
+
+# End the session
+collector.end_session(session_id, status="complete")
+```
+
+**Accessing Metrics**:
+```python
+# Get current dashboard state
+state = collector.get_state()
+
+# Check global metrics
+print(f"Total tokens: {state['total_tokens']}")
+print(f"Total cost: ${state['total_cost_usd']:.2f}")
+print(f"Sessions: {state['total_sessions']}")
+
+# Check specific agent profile
+coding_profile = state["agents"]["coding"]
+print(f"Coding agent success rate: {coding_profile['success_rate']*100:.1f}%")
+print(f"Coding agent XP: {coding_profile['xp']}")
+print(f"Achievements: {', '.join(coding_profile['achievements'])}")
+print(f"Strengths: {', '.join(coding_profile['strengths'])}")
+
+# Browse recent events
+for event in state["events"][-10:]:  # Last 10 events
+    print(f"{event['agent_name']}: {event['status']} ({event['total_tokens']} tokens, ${event['estimated_cost_usd']:.4f})")
+
+# Check session history
+for session in state["sessions"]:
+    print(f"Session {session['session_number']}: {session['status']} - {', '.join(session['agents_invoked'])}")
+```
+
+**Error Handling**:
+```python
+with collector.track_agent("coding", "AI-51", "claude-sonnet-4-5", session_id) as tracker:
+    tracker.add_tokens(input_tokens=1000, output_tokens=500)
+    # If an exception occurs, tracker will:
+    # 1. Record the event with status="error"
+    # 2. Preserve the error message
+    # 3. Reset the agent's success streak
+    # The exception still propagates to the caller
+    try:
+        dangerous_operation()
+    except Exception as e:
+        tracker.set_error(str(e))
+        # Event will be recorded with this error message
+        raise
+```
+
+### Integration with agent.py
+
+The session loop in `agent.py` has been instrumented with metrics collection. When `run_agent_session()` is called:
+
+1. A collector is initialized for the project
+2. Session lifecycle is tracked (start -> agent invocations -> end)
+3. Agent delegations to sub-agents are captured
+4. Token counts from SDK response metadata are recorded
+5. Orchestrator state is persisted to `.agent_metrics.json`
+
+The metrics file is created automatically in the project directory on first session and updated after each event.
+
+### Accessing the Metrics File
+
+The `.agent_metrics.json` file is stored in the project directory and contains the complete dashboard state:
+
+```bash
+# View metrics summary
+python -c "
+from metrics_store import MetricsStore
+from pathlib import Path
+
+store = MetricsStore('my-project', metrics_dir=Path('my-project'))
+state = store.load()
+
+print(f'Project: {state[\"project_name\"]}')
+print(f'Total sessions: {state[\"total_sessions\"]}')
+print(f'Total cost: ${state[\"total_cost_usd\"]:.2f}')
+print(f'Agents tracked: {list(state[\"agents\"].keys())}')
+"
+
+# Get storage stats
+python -c "
+from metrics_store import MetricsStore
+from pathlib import Path
+
+store = MetricsStore('my-project', metrics_dir=Path('my-project'))
+stats = store.get_stats()
+print(f'Metrics file size: {stats[\"metrics_file_size_bytes\"]} bytes')
+print(f'Events logged: {stats[\"event_count\"]}')
+print(f'Sessions: {stats[\"session_count\"]}')
+print(f'Agents: {stats[\"agent_count\"]}')
+"
+```
+
+### Cost Tracking
+
+Token counts are converted to costs using the following pricing (per 1000 tokens):
+
+- **claude-opus-4-6**: input=$0.015, output=$0.075
+- **claude-sonnet-4-5**: input=$0.003, output=$0.015
+- **claude-haiku-4-5**: input=$0.0008, output=$0.004
+- Other models default to Sonnet pricing
+
+Cost is calculated per-event and aggregated at the agent and session level:
+
+```python
+# Calculate cost for an event
+from agent_metrics_collector import _calculate_cost
+
+cost = _calculate_cost("claude-sonnet-4-5", input_tokens=1000, output_tokens=2000)
+# cost = (1000/1000)*0.003 + (2000/1000)*0.015 = 0.033 USD
+```
+
+### Gamification System
+
+Agents earn XP and achievements:
+
+- **XP**: Awarded per successful invocation (scaled by cost and tokens)
+- **Levels**: Derived from XP thresholds (level 1 at 0 XP, increases every 1000 XP)
+- **Achievements**: 12 types including:
+  - first_blood: First successful invocation
+  - century_club: 100 successful invocations
+  - perfect_day: 10+ invocations in one session with no errors
+  - speed_demon: 5 consecutive completions under 30 seconds
+  - comeback_kid: Success after 3+ consecutive errors
+  - big_spender: Single invocation over $1.00
+  - penny_pincher: 50+ successes at < $0.01 each
+  - marathon: 100+ invocations in single project
+  - polyglot: Used across 5+ different ticket types
+  - night_owl: Invocation between 00:00-05:00 local time
+  - streak_10: 10 consecutive successes
+  - streak_25: 25 consecutive successes
+
+### Testing
+
+Test files are provided:
+- `test_agent_session_metrics.py`: Unit tests for metrics collection, cost calculation, profile updates
+- `test_integration_agent_session.py`: Integration tests showing full session flow
+- `example_agent_session_metrics.py`: Runnable examples demonstrating all features
+
+Run tests:
+```bash
+python -m pytest test_agent_session_metrics.py -v
+python -m pytest test_integration_agent_session.py -v
+python example_agent_session_metrics.py
+```
