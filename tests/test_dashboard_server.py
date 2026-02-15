@@ -230,8 +230,15 @@ class TestDashboardServer(AioHTTPTestCase):
         resp = await self.client.request('GET', '/api/metrics')
         assert resp.status == 200
 
-        # Check CORS headers
-        assert resp.headers['Access-Control-Allow-Origin'] == '*'
+        # Check CORS headers - should be localhost by default (security-first)
+        assert 'Access-Control-Allow-Origin' in resp.headers
+        # Default allows localhost origins
+        assert resp.headers['Access-Control-Allow-Origin'] in [
+            'http://localhost:3000',
+            'http://localhost:8080',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:8080'
+        ]
         assert 'Access-Control-Allow-Methods' in resp.headers
         assert 'Access-Control-Allow-Headers' in resp.headers
 
@@ -241,8 +248,14 @@ class TestDashboardServer(AioHTTPTestCase):
         resp = await self.client.request('OPTIONS', '/api/metrics')
         assert resp.status == 204
 
-        # OPTIONS should have CORS headers
-        assert resp.headers['Access-Control-Allow-Origin'] == '*'
+        # OPTIONS should have CORS headers - should be localhost by default (security-first)
+        assert 'Access-Control-Allow-Origin' in resp.headers
+        assert resp.headers['Access-Control-Allow-Origin'] in [
+            'http://localhost:3000',
+            'http://localhost:8080',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:8080'
+        ]
 
     @unittest_run_loop
     async def test_empty_metrics(self):
@@ -278,7 +291,14 @@ class TestDashboardServer(AioHTTPTestCase):
         """Test health check endpoint has CORS headers."""
         resp = await self.client.request('GET', '/health')
         assert resp.status == 200
-        assert resp.headers['Access-Control-Allow-Origin'] == '*'
+        # Should be localhost by default (security-first)
+        assert 'Access-Control-Allow-Origin' in resp.headers
+        assert resp.headers['Access-Control-Allow-Origin'] in [
+            'http://localhost:3000',
+            'http://localhost:8080',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:8080'
+        ]
 
     def tearDown(self):
         """Clean up test files."""
@@ -311,7 +331,7 @@ class TestDashboardServerUnit:
 
         assert server.project_name == 'agent-status-dashboard'
         assert server.port == 8080
-        assert server.host == '0.0.0.0'
+        assert server.host == '127.0.0.1'  # Default is localhost-only for security
         assert server.metrics_dir == Path.cwd()
 
     def test_routes_registered(self):

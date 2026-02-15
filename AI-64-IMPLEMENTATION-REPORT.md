@@ -101,15 +101,36 @@ Successfully implemented a production-ready HTTP API server using aiohttp that e
 
 ### 3. CORS Configuration
 
-Implemented comprehensive CORS support for web dashboard access:
+Implemented comprehensive CORS support for web dashboard access with security-first defaults:
 
 - **Middleware**: cors_middleware applied to all responses
+- **Environment-Based Configuration**:
+  - Controlled via `CORS_ALLOWED_ORIGINS` environment variable
+  - Default: `http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080`
+  - Supports multiple origins (comma-separated) or wildcard `*` for development
+  - Security warning logged when using wildcard in production
 - **Headers Set**:
-  - `Access-Control-Allow-Origin: *` (allows all origins for development)
+  - `Access-Control-Allow-Origin`: Dynamically set based on request origin
   - `Access-Control-Allow-Methods: GET, POST, OPTIONS`
   - `Access-Control-Allow-Headers: Content-Type, Authorization`
+  - `Access-Control-Allow-Credentials: true`
 - **Preflight Support**: OPTIONS requests handled for CORS preflight
 - **Verified**: All endpoints return proper CORS headers
+
+#### CORS Security Examples
+```bash
+# Development (localhost only - default)
+# No environment variable needed
+
+# Development (allow all origins - use with caution)
+export CORS_ALLOWED_ORIGINS='*'
+
+# Production (specific domain)
+export CORS_ALLOWED_ORIGINS='https://dashboard.example.com'
+
+# Production (multiple domains)
+export CORS_ALLOWED_ORIGINS='https://dashboard.example.com,https://api.example.com'
+```
 
 ### 4. A2UI Component Integration
 
@@ -255,8 +276,10 @@ All screenshots saved in: `verification_evidence/`
 
 #### Configuration
 - CLI arguments for port, host, metrics directory, project name
-- Default values: port=8080, host=0.0.0.0
+- Default values: port=8080, host=127.0.0.1 (localhost-only for security)
+- Host binding configurable via --host argument
 - Help text with examples and endpoint documentation
+- Security warnings for network-exposed configurations
 
 #### Logging
 - Structured logging with timestamps
@@ -294,6 +317,125 @@ All screenshots saved in: `verification_evidence/`
 
 ### Modified
 1. `/Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard/requirements.txt`
+
+## Security Considerations
+
+### Production Deployment Security
+
+The dashboard server implements security-first defaults suitable for production deployment:
+
+#### 1. Host Binding Security
+
+**Default Behavior**:
+- Server binds to `127.0.0.1` (localhost only) by default
+- Prevents accidental network exposure during development
+- Security warning logged when binding to `0.0.0.0` (all network interfaces)
+
+**Configuration**:
+```bash
+# Localhost only (default - recommended for development)
+python dashboard_server.py
+
+# Bind to all network interfaces (WARNING: exposes to network)
+python dashboard_server.py --host 0.0.0.0
+```
+
+**Production Recommendation**:
+- **Never expose the server directly to the internet**
+- Use a reverse proxy (nginx, caddy, traefik) with proper TLS/SSL
+- Keep the dashboard server on `127.0.0.1` and proxy through HTTPS
+- Enable authentication/authorization at the reverse proxy layer
+
+#### 2. CORS Configuration Security
+
+**Default Behavior**:
+- Allows localhost origins only: `http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080`
+- Prevents unauthorized cross-origin requests in production
+- Security warning logged when using wildcard `*`
+
+**Environment Variable**:
+```bash
+# Development (localhost - default)
+# No configuration needed
+
+# Development (all origins - use with caution)
+export CORS_ALLOWED_ORIGINS='*'
+
+# Production (specific domain)
+export CORS_ALLOWED_ORIGINS='https://dashboard.example.com'
+
+# Production (multiple domains)
+export CORS_ALLOWED_ORIGINS='https://dashboard.example.com,https://api.example.com'
+```
+
+**Production Recommendation**:
+- Always set `CORS_ALLOWED_ORIGINS` to your specific frontend domain(s)
+- Never use wildcard `*` in production
+- Use HTTPS origins only in production
+- Review CORS configuration during deployment
+
+#### 3. Production Deployment Example
+
+**Recommended Architecture**:
+```
+Internet → nginx (TLS/SSL, port 443)
+           → Dashboard Server (127.0.0.1:8080)
+              → Metrics Files (local filesystem)
+```
+
+**nginx Configuration Example**:
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name dashboard.example.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:8080;
+    }
+}
+```
+
+**Systemd Service Example**:
+```ini
+[Unit]
+Description=Agent Status Dashboard Server
+After=network.target
+
+[Service]
+Type=simple
+User=dashboard
+WorkingDirectory=/opt/dashboard
+Environment="CORS_ALLOWED_ORIGINS=https://dashboard.example.com"
+ExecStart=/usr/bin/python3 dashboard_server.py --host 127.0.0.1 --port 8080
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 4. Security Checklist for Production
+
+- [ ] Server bound to `127.0.0.1` (not `0.0.0.0`)
+- [ ] `CORS_ALLOWED_ORIGINS` set to specific domain(s)
+- [ ] Reverse proxy configured with TLS/SSL
+- [ ] Authentication/authorization enabled at proxy level
+- [ ] Firewall rules restrict access to dashboard server port
+- [ ] Metrics files have appropriate file permissions
+- [ ] Server runs as non-root user
+- [ ] Logging configured for security audit trails
+- [ ] Rate limiting enabled at reverse proxy
+- [ ] Regular security updates applied
 
 ## Usage Examples
 

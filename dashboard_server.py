@@ -10,9 +10,12 @@ Endpoints:
     GET /health - Health check endpoint
 
 CORS Configuration:
-    - Allows all origins for development
+    - Configurable via CORS_ALLOWED_ORIGINS environment variable
+    - Defaults to localhost origins for development security
     - Supports GET, POST, OPTIONS methods
     - Allows Content-Type, Authorization headers
+    - Set CORS_ALLOWED_ORIGINS='*' for development (with security warning)
+    - For production, set specific domains (e.g., 'https://dashboard.example.com')
 
 A2UI Component Integration:
     This server provides data that can be visualized using A2UI components:
@@ -56,6 +59,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -74,14 +78,56 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# CORS middleware for development
+# Get CORS allowed origins from environment
+def get_cors_origins() -> str:
+    """Get CORS allowed origins from environment variable.
+
+    Returns:
+        Comma-separated list of allowed origins or '*' for development.
+        Defaults to localhost origins for security.
+    """
+    origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080')
+
+    # Warn if using wildcard in production
+    if origins == '*':
+        logger.warning(
+            "SECURITY WARNING: CORS is configured to allow all origins (*). "
+            "This is acceptable for development but should NOT be used in production. "
+            "Set CORS_ALLOWED_ORIGINS to specific domains for production deployment."
+        )
+
+    return origins
+
+
+# CORS middleware with environment-based configuration
 @middleware
 async def cors_middleware(request: Request, handler):
-    """Add CORS headers to all responses for development."""
+    """Add CORS headers to all responses.
+
+    CORS origins are configured via CORS_ALLOWED_ORIGINS environment variable.
+    Defaults to localhost origins for development security.
+    """
     response = await handler(request)
-    response.headers['Access-Control-Allow-Origin'] = '*'
+
+    allowed_origins = get_cors_origins()
+
+    # Handle multiple origins or wildcard
+    if allowed_origins == '*':
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    else:
+        # Check if request origin is in allowed list
+        origin = request.headers.get('Origin', '')
+        allowed_list = [o.strip() for o in allowed_origins.split(',')]
+
+        if origin in allowed_list:
+            response.headers['Access-Control-Allow-Origin'] = origin
+        elif allowed_list:
+            # Default to first allowed origin if no match
+            response.headers['Access-Control-Allow-Origin'] = allowed_list[0]
+
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
 
@@ -119,7 +165,7 @@ class DashboardServer:
         project_name: str = "agent-status-dashboard",
         metrics_dir: Optional[Path] = None,
         port: int = 8080,
-        host: str = "0.0.0.0"
+        host: str = "127.0.0.1"
     ):
         """Initialize DashboardServer.
 
@@ -127,12 +173,26 @@ class DashboardServer:
             project_name: Project name for metrics store
             metrics_dir: Directory containing .agent_metrics.json
             port: HTTP server port
-            host: HTTP server host
+            host: HTTP server host (default: 127.0.0.1 for localhost-only access)
+
+        Security Notes:
+            - Default host is 127.0.0.1 (localhost only) for security
+            - Use host="0.0.0.0" to bind to all network interfaces (WARNING: exposes server to network)
+            - For production, use a reverse proxy (nginx/caddy) with proper TLS/SSL
         """
         self.project_name = project_name
         self.metrics_dir = metrics_dir or Path.cwd()
         self.port = port
         self.host = host
+
+        # Security warning for 0.0.0.0 binding
+        if host == "0.0.0.0":
+            logger.warning(
+                "SECURITY WARNING: Server is binding to 0.0.0.0 (all network interfaces). "
+                "This exposes the server to your network. "
+                "For production deployment, use a reverse proxy with TLS/SSL. "
+                "For local development, consider using 127.0.0.1 instead."
+            )
 
         # Initialize metrics store
         self.store = MetricsStore(
@@ -363,8 +423,8 @@ A2UI Components:
     parser.add_argument(
         '--host',
         type=str,
-        default='0.0.0.0',
-        help='HTTP server host (default: 0.0.0.0)'
+        default='127.0.0.1',
+        help='HTTP server host (default: 127.0.0.1 for localhost-only access; use 0.0.0.0 to expose to network)'
     )
 
     parser.add_argument(
