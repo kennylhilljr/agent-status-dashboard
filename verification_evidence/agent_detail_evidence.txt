@@ -1,0 +1,47 @@
+Agent Status Dashboard CLI
+Metrics file: 
+/Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboar
+d/.agent_metrics.json
+
+╭─────────────────────────────── Agent Profile ────────────────────────────────╮
+│ coding                                                                       │
+│ Experience (XP): 0 XP (Level 1 - Intern)                                     │
+│ Current Streak: 6 (Best: 6)                                                  │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────── Performance Metrics ─────────────────────────────╮
+│ Success Rate: 100.0%                                                         │
+│ Invocations: 6 successful, 0 failed (Total: 6)                               │
+│ Average Duration: 0s                                                         │
+│ Tokens Per Call: 3667 tokens                                                 │
+│ Cost Per Success: $0.0390                                                    │
+│                                                                              │
+│ Total Stats:                                                                 │
+│   • Tokens: 22,000                                                           │
+│   • Cost: $0.2340                                                            │
+│   • Duration: 0s                                                             │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭─── Strengths & Weaknesses ───╮ ╭───────────── Achievements ──────────────╮
+│ Strengths:                   │ │   [dim]No achievements earned yet[/dim] │
+│   [dim]None identified[/dim] │ │                                         │
+│                              │ │ Total Achievements: 0                   │
+│ Weaknesses:                  │ ╰─────────────────────────────────────────╯
+│   [dim]None identified[/dim] │                                            
+│                              │                                            
+╰──────────────────────────────╯                                            
+
+                             Recent Events (coding)                             
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ Time                 ┃ Ticket       ┃ Status     ┃ Tokens     ┃ Duration     ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ 3h ago               │ AI-TEST      │ SUCCESS    │ 3,000      │ 0s           │
+│ 3h ago               │ AI-TEST      │ SUCCESS    │ 3,000      │ 0s           │
+│ 3h ago               │ AI-TEST      │ SUCCESS    │ 3,000      │ 0s           │
+│ 3h ago               │ AI-TEST      │ SUCCESS    │ 3,000      │ 0s           │
+│ 5h ago               │ AI-46        │ SUCCESS    │ 5,000      │ 0s           │
+│ 5h ago               │ AI-46        │ SUCCESS    │ 5,000      │ 0s           │
+└──────────────────────┴──────────────┴────────────┴────────────┴──────────────┘
+
