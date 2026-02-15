@@ -21,6 +21,7 @@ from claude_agent_sdk import (
 )
 
 from agent import SESSION_CONTINUE, SESSION_ERROR, SessionResult
+from artifact_detector import get_artifact_detector
 from progress import LINEAR_PROJECT_MARKER
 
 
@@ -233,9 +234,22 @@ async def run_orchestrated_session(
                                         error_msg = str(block.content) if hasattr(block, 'content') else "Unknown error"
                                         tracker.set_error(error_msg)
                                     else:
-                                        # Extract artifacts from successful completion
-                                        # This is a simplified version - real implementation would parse result
-                                        tracker.add_artifact(f"delegation:{agent_name}")
+                                        # AI-53: Extract artifacts from successful completion using artifact detector
+                                        result_content = str(block.content) if hasattr(block, 'content') else ""
+
+                                        # Get artifact detector instance
+                                        artifact_detector = get_artifact_detector()
+
+                                        # Detect artifacts from the delegation result
+                                        detected_artifacts = artifact_detector.detect_artifacts(
+                                            agent_name=agent_name,
+                                            tool_results=result_content,
+                                            additional_context=task_description
+                                        )
+
+                                        # Add all detected artifacts to the tracker
+                                        for artifact in detected_artifacts:
+                                            tracker.add_artifact(artifact)
 
                                 # Remove from active delegations
                                 del active_delegations[block.tool_use_id]
