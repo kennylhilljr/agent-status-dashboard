@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+
+# Virtual environments
+venv/
+venv_linux/
+.venv/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment and configuration
+.env
+.env.tmp
+api-key
+.jira_tokens.json
+
+# Output and logs
+logs/
+generations/
+
+# Project-specific
+screenshots/
+.agent_metrics.json
+verification_files/
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# MCP and tools
+.playwright-mcp/
+.claude/

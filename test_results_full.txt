@@ -1,0 +1,42 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard
+configfile: pyproject.toml
+collecting ... collected 33 items
+
+test_integration_agent_session.py::TestFullSessionWorkflow::test_initializer_session_workflow PASSED [  3%]
+test_integration_agent_session.py::TestFullSessionWorkflow::test_continuation_session_workflow PASSED [  6%]
+test_integration_agent_session.py::TestMultiAgentDelegation::test_orchestrator_delegation_pattern PASSED [  9%]
+test_integration_agent_session.py::TestMultiAgentDelegation::test_parallel_agent_invocations_in_session PASSED [ 12%]
+test_integration_agent_session.py::TestErrorRecoveryScenarios::test_session_with_partial_failures PASSED [ 15%]
+test_integration_agent_session.py::TestErrorRecoveryScenarios::test_retry_after_error_session PASSED [ 18%]
+test_integration_agent_session.py::TestPersistenceAcrossRestarts::test_state_persists_between_collector_instances PASSED [ 21%]
+test_integration_agent_session.py::TestPersistenceAcrossRestarts::test_continuation_session_sees_previous_sessions PASSED [ 24%]
+test_integration_agent_session.py::TestPersistenceAcrossRestarts::test_metrics_file_structure PASSED [ 27%]
+test_integration_agent_session.py::TestRealisticTokenCosts::test_session_calculates_realistic_costs PASSED [ 30%]
+test_integration_agent_session.py::TestRealisticTokenCosts::test_high_token_usage_session PASSED [ 33%]
+test_integration_agent_session.py::TestCompleteProjectLifecycle::test_full_project_lifecycle PASSED [ 36%]
+test_agent_session_metrics.py::TestSessionLifecycleBasics::test_start_session_creates_session_id PASSED [ 39%]
+test_agent_session_metrics.py::TestSessionLifecycleBasics::test_start_session_tracks_session_type PASSED [ 42%]
+test_agent_session_metrics.py::TestSessionLifecycleBasics::test_end_session_creates_summary PASSED [ 45%]
+test_agent_session_metrics.py::TestSessionLifecycleBasics::test_end_session_increments_total_sessions PASSED [ 48%]
+test_agent_session_metrics.py::TestSessionLifecycleBasics::test_end_session_with_invalid_id_raises_error PASSED [ 51%]
+test_agent_session_metrics.py::TestSessionStatusTracking::test_session_status_continue PASSED [ 54%]
+test_agent_session_metrics.py::TestSessionStatusTracking::test_session_status_error PASSED [ 57%]
+test_agent_session_metrics.py::TestSessionStatusTracking::test_session_status_complete PASSED [ 60%]
+test_agent_session_metrics.py::TestSessionNumbering::test_session_numbers_increment_sequentially PASSED [ 63%]
+test_agent_session_metrics.py::TestSessionNumbering::test_session_numbers_persist_across_collector_instances PASSED [ 66%]
+test_agent_session_metrics.py::TestSessionAgentTracking::test_session_tracks_agents_invoked PASSED [ 69%]
+test_agent_session_metrics.py::TestSessionAgentTracking::test_session_tracks_unique_agents_only PASSED [ 72%]
+test_agent_session_metrics.py::TestSessionTokenAndCostTracking::test_session_aggregates_tokens PASSED [ 75%]
+test_agent_session_metrics.py::TestSessionTokenAndCostTracking::test_session_aggregates_costs PASSED [ 78%]
+test_agent_session_metrics.py::TestSessionTicketTracking::test_session_tracks_tickets_worked PASSED [ 81%]
+test_agent_session_metrics.py::TestSessionTicketTracking::test_session_deduplicates_ticket_keys PASSED [ 84%]
+test_agent_session_metrics.py::TestContinuationFlow::test_multiple_sessions_accumulate_correctly PASSED [ 87%]
+test_agent_session_metrics.py::TestContinuationFlow::test_continuation_session_loads_previous_state PASSED [ 90%]
+test_agent_session_metrics.py::TestErrorHandling::test_session_handles_event_errors_gracefully PASSED [ 93%]
+test_agent_session_metrics.py::TestErrorHandling::test_graceful_degradation_when_metrics_unavailable PASSED [ 96%]
+test_agent_session_metrics.py::TestTimestamps::test_session_has_start_and_end_timestamps PASSED [100%]
+
+============================== 33 passed in 0.18s ==============================
