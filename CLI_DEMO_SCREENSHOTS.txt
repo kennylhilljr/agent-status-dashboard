@@ -1,0 +1,250 @@
+================================================================================
+UNIFIED DASHBOARD CLI - WORKING FEATURE SCREENSHOTS
+================================================================================
+
+SCREENSHOT 1: Help Output
+==========================
+$ python scripts/cli.py --help
+
+usage: cli.py [-h] [--json | --agent NAME | --leaderboard | --achievements]
+              [--once] [--metrics-dir METRICS_DIR]
+              [--refresh-rate REFRESH_RATE]
+
+Unified Agent Status Dashboard CLI with multiple modes
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --json                Output metrics as JSON to stdout
+  --agent NAME          Show detailed view for specific agent
+  --leaderboard         Show leaderboard view sorted by XP
+  --achievements        Show achievements view (optionally filtered by --agent)
+  --once                Run without live updates (applies to dashboard,
+                        leaderboard, achievements)
+  --metrics-dir METRICS_DIR
+                        Directory containing metrics.json (default:
+                        ~/.agent_metrics or ./.agent_metrics.json)
+  --refresh-rate REFRESH_RATE
+                        Refresh rate in milliseconds (default: 500ms, applies
+                        to live modes)
+
+Examples:
+  cli.py                         # Live dashboard
+  cli.py --once                  # Single dashboard update
+  cli.py --json                  # Output JSON metrics
+  cli.py --agent coding          # Agent detail view
+  cli.py --leaderboard           # Live leaderboard
+  cli.py --leaderboard --once    # Single leaderboard update
+  cli.py --achievements          # Achievements view
+
+
+SCREENSHOT 2: Dashboard --once Mode
+====================================
+$ python scripts/cli.py --once --metrics-dir /tmp
+
+Agent Status Dashboard CLI
+Metrics file: /tmp/metrics.json
+╭─────────────────────────── Agent Status Dashboard ───────────────────────────╮
+│ Project: Agent Status Dashboard                                              │
+│ Last Updated: 2026-02-15 02:50:00 UTC                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────────╮╭─── Dashboard Metrics ───╮
+│                   Agent Status                    ││ Active Tasks: 0         │
+│ ┏━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━┓ ││                         │
+│ ┃ Agent   ┃ Sta… ┃ Current Task           ┃ Du… ┃ ││ Recent Completions:     │
+│ ┡━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━┩ ││   ✓ claude: AI-102      │
+│ │ claude  │ Idle │ Waiting                │ 3h  │ ││   ✓ github: AI-101      │
+│ │         │      │                        │ ago │ ││   ✓ coding: AI-100      │
+│ │ coding  │ Idle │ Waiting                │ 18m │ ││                         │
+│ │         │      │                        │ ago │ ││ System Load:            │
+│ │ github  │ Idle │ Waiting                │ 1h  │ ││ [yellow]Medium[/yellow] │
+│ │         │      │                        │ ago │ ││ (15 sessions, 45,000    │
+│ │ linear  │ Idle │ Waiting                │ 2h  │ ││ tokens)                 │
+│ │         │      │                        │ ago │ ││                         │
+│ └─────────┴──────┴────────────────────────┴─────┘ ││                         │
+╰───────────────────────────────────────────────────╯╰─────────────────────────╯
+
+
+SCREENSHOT 3: Agent Detail Mode (--agent coding)
+=================================================
+$ python scripts/cli.py --agent coding --metrics-dir /tmp
+
+Agent Status Dashboard CLI
+Metrics file: /tmp/metrics.json
+
+╭─────────────────────────────── Agent Profile ────────────────────────────────╮
+│ coding                                                                       │
+│ Experience (XP): 1200 XP (Level 4 - Senior)                                  │
+│ Current Streak: 8 (Best: 15)                                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────── Performance Metrics ─────────────────────────────╮
+│ Success Rate: 92.0%                                                          │
+│ Invocations: 23 successful, 2 failed (Total: 25)                             │
+│ Average Duration: 7s                                                         │
+│ Tokens Per Call: 652 tokens                                                  │
+│ Cost Per Success: $0.0065                                                    │
+│                                                                              │
+│ Total Stats:                                                                 │
+│   • Tokens: 15,000                                                           │
+│   • Cost: $0.1500                                                            │
+│   • Duration: 3m 0s                                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭─ Strengths & Weaknesses ─╮ ╭──── Achievements ─────╮
+│ Strengths:               │ │   🏆 First Blood      │
+│   ✓ Pattern Recognition  │ │   🏆 Century Club     │
+│   ✓ Code Generation      │ │   🏆 Speed Demon      │
+│   ✓ Debugging            │ │                       │
+│                          │ │ Total Achievements: 3 │
+│ Weaknesses:              │ ╰───────────────────────╯
+│   ✗ Optimization         │
+╰──────────────────────────╯
+
+                             Recent Events (coding)
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ Time                 ┃ Ticket       ┃ Status     ┃ Tokens     ┃ Duration     ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ 19m ago              │ AI-100       │ SUCCESS    │ 800        │ 1m 0s        │
+└──────────────────────┴──────────────┴────────────┴────────────┴──────────────┘
+
+
+SCREENSHOT 4: Leaderboard Mode (--leaderboard --once)
+======================================================
+$ python scripts/cli.py --leaderboard --once --metrics-dir /tmp
+
+Agent Status Dashboard CLI
+Metrics file: /tmp/metrics.json
+╭───────────────────────────── Agent Leaderboard ──────────────────────────────╮
+│ Project: Agent Status Dashboard                                              │
+│ Total Agents: 4  Total XP: 3600                                              │
+│ Last Updated: 2026-02-15 02:50:00 UTC                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                       Agent Leaderboard (Sorted by XP)                       │
+│ ┏━━━┳━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┓ │
+│ ┃   ┃            ┃     ┃         ┃   Success ┃   Avg ┃           ┃         ┃ │
+│ ┃ # ┃ Agent      ┃ XP  ┃ Level   ┃      Rate ┃ Time  ┃ Cost/Suc… ┃ Status  ┃ │
+│ ┡━━━╇━━━━━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━┩ │
+│ │ # │ coding     │ 12… │ Senior  │     92.0% │    7s │   $0.0065 │ Idle    │ │
+│ │ # │ github     │ 950 │ Mid-Le… │    100.0% │    8s │   $0.0067 │ Idle    │ │
+│ │ # │ claude     │ 850 │ Mid-Le… │    100.0% │    3s │   $0.0112 │ Idle    │ │
+│ │ # │ linear     │ 600 │ Junior  │     75.0% │   10s │   $0.0100 │ Idle    │ │
+│ └───┴────────────┴─────┴─────────┴───────────┴───────┴───────────┴─────────┘ │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+SCREENSHOT 5: Achievements Mode (--achievements --once)
+========================================================
+$ python scripts/cli.py --achievements --once --metrics-dir /tmp
+
+Agent Status Dashboard CLI
+Metrics file: /tmp/metrics.json
+╭─────────────────────────── Achievements Dashboard ───────────────────────────╮
+│ Project: Agent Status Dashboard                                              │
+│ Total Agents: 4                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ claude:                                                                      │
+│   • first_blood                                                              │
+│   • speed_demon                                                              │
+│   • streak_10                                                                │
+│                                                                              │
+│ coding:                                                                      │
+│   • first_blood                                                              │
+│   • century_club                                                             │
+│   • speed_demon                                                              │
+│                                                                              │
+│ github:                                                                      │
+│   • first_blood                                                              │
+│   • streak_10                                                                │
+│                                                                              │
+│ linear:                                                                      │
+│   • first_blood                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+SCREENSHOT 6: JSON Mode (--json)
+=================================
+$ python scripts/cli.py --json --metrics-dir /tmp | python -m json.tool | head -50
+
+{
+    "version": 1,
+    "project_name": "Agent Status Dashboard",
+    "created_at": "2026-02-14T00:00:00Z",
+    "updated_at": "2026-02-15T02:50:00Z",
+    "total_sessions": 15,
+    "total_tokens": 45000,
+    "total_cost_usd": 0.45,
+    "total_duration_seconds": 450.0,
+    "agents": {
+        "coding": {
+            "agent_name": "coding",
+            "total_invocations": 25,
+            "successful_invocations": 23,
+            "failed_invocations": 2,
+            "success_rate": 0.92,
+            "last_active": "2026-02-15T02:30:00Z",
+            "total_tokens": 15000,
+            "total_cost_usd": 0.15,
+            "total_duration_seconds": 180.0,
+            "avg_duration_seconds": 7.8,
+            "avg_tokens_per_call": 652.0,
+            "cost_per_success_usd": 0.0065,
+            "xp": 1200,
+            "level": 4,
+            "current_streak": 8,
+            "best_streak": 15,
+            "strengths": [
+                "pattern_recognition",
+                "code_generation",
+                "debugging"
+            ],
+            "weaknesses": [
+                "optimization"
+            ],
+            "achievements": [
+                "first_blood",
+                "century_club",
+                "speed_demon"
+            ]
+        }
+    }
+}
+
+[Output continues...]
+
+
+TEST EXECUTION PROOF:
+=======================
+$ python -m pytest tests/test_cli.py -v
+
+============================= test session starts ==============================
+...
+tests/test_cli.py::TestUnifiedDashboardCLI::test_cli_initialization PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_cli_initialization_with_default_console PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_json_output_mode PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_json_output_missing_file PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_once_dashboard_mode PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_once_dashboard_missing_file PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_agent_detail_mode PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_agent_detail_nonexistent_agent PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_agent_detail_missing_file PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_leaderboard_once_mode PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_leaderboard_missing_file PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_achievements_once_mode PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_achievements_single_agent PASSED
+tests/test_cli.py::TestUnifiedDashboardCLI::test_achievements_missing_file PASSED
+tests/test_cli.py::TestCLIArgumentParsing::test_help_output PASSED
+tests/test_cli.py::TestCLIArgumentParsing::test_json_mode_argument PASSED
+tests/test_cli.py::TestCLIArgumentParsing::test_once_flag_argument PASSED
+tests/test_cli.py::TestCLIArgumentParsing::test_agent_mode_argument PASSED
+tests/test_cli.py::TestCLIIntegration::test_full_cli_workflow PASSED
+tests/test_cli.py::TestCLIIntegration::test_cli_with_nonexistent_metrics_file PASSED
+tests/test_cli.py::TestCLIIntegration::test_json_output_is_valid_json PASSED
+tests/test_cli.py::TestCLIEdgeCases::test_empty_metrics_file PASSED
+tests/test_cli.py::TestCLIEdgeCases::test_corrupted_metrics_file PASSED
+tests/test_cli.py::TestCLIEdgeCases::test_agent_detail_with_missing_agent PASSED
+
+============================== 24 passed in 1.97s =======================================

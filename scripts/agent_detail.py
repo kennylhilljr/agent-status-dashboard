@@ -306,6 +306,38 @@ class AgentDetailRenderer:
 
         return Panel(text, title=f"Agent Detail: {agent_name}", border_style="blue")
 
+    def render_agent_detail(
+        self,
+        agent_name: str,
+        agent_data: Dict[str, Any],
+        state: Dict[str, Any]
+    ) -> None:
+        """Render and display complete agent detail view.
+
+        Args:
+            agent_name: Name of the agent
+            agent_data: Agent data dictionary from metrics
+            state: Complete metrics state dictionary
+        """
+        events = state.get("events", [])
+
+        # Create and display panels
+        self.console.print()
+        self.console.print(self.create_profile_panel(agent_data, agent_name))
+        self.console.print()
+        self.console.print(self.create_performance_panel(agent_data))
+        self.console.print()
+
+        # Strengths and achievements in columns
+        strengths_panel = self.create_strengths_weaknesses_panel(agent_data)
+        achievements_panel = self.create_achievements_panel(agent_data)
+        self.console.print(Columns([strengths_panel, achievements_panel]))
+        self.console.print()
+
+        # Recent events table
+        self.console.print(self.create_recent_events_table(events, agent_name))
+        self.console.print()
+
     @staticmethod
     def _format_duration(seconds: float) -> str:
         """Format seconds into human-readable duration string.
