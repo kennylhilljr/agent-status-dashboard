@@ -60,12 +60,52 @@
             font-size: 0.9rem;
         }
 
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid;
+            transition: all 0.3s ease;
+        }
+
+        .connection-status.connected {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .connection-status.connecting {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .connection-status.disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
         .refresh-indicator {
             width: 8px;
             height: 8px;
             border-radius: 50%;
             background: #10b981;
             animation: pulse 2s ease-in-out infinite;
+        }
+
+        .refresh-indicator.connecting {
+            background: #f59e0b;
+            animation: spin 1s linear infinite;
+        }
+
+        .refresh-indicator.disconnected {
+            background: #ef4444;
+            animation: none;
         }
 
         @keyframes pulse {
@@ -525,8 +565,10 @@
             <h1>Agent Status Dashboard</h1>
             <p>Real-time monitoring of autonomous agent performance</p>
             <div class="refresh-info">
-                <div class="refresh-indicator"></div>
-                <span>Auto-refresh every 30 seconds</span>
+                <div class="connection-status" id="connection-status">
+                    <div class="refresh-indicator" id="status-indicator"></div>
+                    <span id="status-text">Connecting...</span>
+                </div>
                 <span id="last-update"></span>
             </div>
         </div>
@@ -653,9 +695,17 @@
     <script>
         // Configuration
         const API_BASE_URL = 'http://localhost:8080';
-        const REFRESH_INTERVAL = 30000; // 30 seconds
+        const WS_BASE_URL = 'ws://localhost:8080';
+        const REFRESH_INTERVAL = 30000; // 30 seconds (fallback if WebSocket fails)
+        const MAX_RECONNECT_DELAY = 30000; // 30 seconds max delay
+        const INITIAL_RECONNECT_DELAY = 1000; // 1 second initial delay
+
         let refreshTimer;
         let charts = {};
+        let websocket = null;
+        let reconnectDelay = INITIAL_RECONNECT_DELAY;
+        let reconnectTimer = null;
+        let isManualClose = false;
 
         // Utility Functions
         function formatTime(date) {
@@ -1246,14 +1296,167 @@
                 .then(data => console.log('Agent Details:', data));
         }
 
+        // WebSocket Connection Management
+        function updateConnectionStatus(status, message) {
+            const statusElement = document.getElementById('connection-status');
+            const indicatorElement = document.getElementById('status-indicator');
+            const textElement = document.getElementById('status-text');
+
+            if (!statusElement || !indicatorElement || !textElement) return;
+
+            // Remove all status classes
+            statusElement.classList.remove('connected', 'connecting', 'disconnected');
+            indicatorElement.classList.remove('connecting', 'disconnected');
+
+            // Add new status class
+            statusElement.classList.add(status);
+            if (status !== 'connected') {
+                indicatorElement.classList.add(status);
+            }
+
+            // Update text
+            textElement.textContent = message;
+
+            console.log(`Connection status: ${status} - ${message}`);
+        }
+
+        function connectWebSocket() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                console.log('WebSocket already connected');
+                return;
+            }
+
+            updateConnectionStatus('connecting', 'Connecting to live updates...');
+
+            try {
+                websocket = new WebSocket(`${WS_BASE_URL}/ws`);
+
+                websocket.onopen = () => {
+                    console.log('WebSocket connected successfully');
+                    updateConnectionStatus('connected', 'Live updates active');
+                    reconnectDelay = INITIAL_RECONNECT_DELAY; // Reset delay on successful connection
+
+                    // Clear fallback timer if using WebSocket
+                    if (refreshTimer) {
+                        clearInterval(refreshTimer);
+                        refreshTimer = null;
+                    }
+                };
+
+                websocket.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+
+                        if (message.type === 'metrics_update') {
+                            console.log('Received metrics update via WebSocket');
+                            handleMetricsUpdate(message.data);
+                        }
+                    } catch (error) {
+                        console.error('Error processing WebSocket message:', error);
+                    }
+                };
+
+                websocket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus('disconnected', 'Connection error');
+                };
+
+                websocket.onclose = (event) => {
+                    console.log('WebSocket closed:', event.code, event.reason);
+                    websocket = null;
+
+                    if (!isManualClose) {
+                        updateConnectionStatus('disconnected', 'Reconnecting...');
+                        scheduleReconnect();
+                    }
+                };
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                updateConnectionStatus('disconnected', 'Connection failed');
+                scheduleReconnect();
+            }
+        }
+
+        function scheduleReconnect() {
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+            }
+
+            console.log(`Scheduling reconnect in ${reconnectDelay}ms`);
+
+            reconnectTimer = setTimeout(() => {
+                console.log('Attempting to reconnect WebSocket...');
+                connectWebSocket();
+
+                // Exponential backoff with max delay
+                reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+            }, reconnectDelay);
+
+            // Enable fallback polling while disconnected
+            if (!refreshTimer) {
+                refreshTimer = setInterval(updateDashboard, REFRESH_INTERVAL);
+                console.log('Fallback polling enabled');
+            }
+        }
+
+        function closeWebSocket() {
+            isManualClose = true;
+
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+
+            updateConnectionStatus('disconnected', 'Disconnected');
+        }
+
+        // Handle metrics update from WebSocket or HTTP
+        function handleMetricsUpdate(data) {
+            // Update timestamp
+            document.getElementById('last-update').textContent =
+                `Updated at ${formatTime(new Date())}`;
+
+            // Render components
+            renderStatsGrid(data);
+            renderAgentCards(data.agents || {});
+            renderActivityFeed(data.events || []);
+
+            // Create charts
+            if (data.agents && Object.keys(data.agents).length > 0) {
+                createSuccessRateChart(data.agents);
+                createXPChart(data.agents);
+                createPerformanceChart(data.agents);
+                createCostChart(data.agents);
+                createInvocationChart(data.agents);
+            }
+        }
+
+        // Main Update Function (HTTP fallback)
+        async function updateDashboard() {
+            const data = await fetchMetrics();
+            if (!data) return;
+
+            handleMetricsUpdate(data);
+        }
+
         // Initialize Dashboard
         async function init() {
             console.log('Initializing Agent Status Dashboard...');
+
+            // Load initial data via HTTP
             await updateDashboard();
 
-            // Set up auto-refresh
-            refreshTimer = setInterval(updateDashboard, REFRESH_INTERVAL);
-            console.log(`Auto-refresh enabled: every ${REFRESH_INTERVAL/1000}s`);
+            // Connect to WebSocket for live updates
+            connectWebSocket();
+
+            console.log('Dashboard initialized');
+            console.log('WebSocket live updates enabled with auto-reconnect');
+            console.log(`Fallback polling: every ${REFRESH_INTERVAL/1000}s`);
         }
 
         // Start when DOM is ready
@@ -1265,6 +1468,7 @@
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
+            closeWebSocket();
             if (refreshTimer) clearInterval(refreshTimer);
             Object.values(charts).forEach(chart => chart && chart.destroy());
         });

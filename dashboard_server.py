@@ -8,6 +8,7 @@ Endpoints:
     GET /api/metrics - Returns complete DashboardState with all metrics
     GET /api/agents/<name> - Returns specific agent profile with detailed stats
     GET /health - Health check endpoint
+    WS  /ws - WebSocket endpoint for real-time metrics streaming
 
 CORS Configuration:
     - Configurable via CORS_ALLOWED_ORIGINS environment variable
@@ -57,15 +58,16 @@ Usage:
 """
 
 import argparse
+import asyncio
 import json
 import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
-from aiohttp import web
-from aiohttp.web import Request, Response, middleware
+from aiohttp import web, WSMsgType
+from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from metrics_store import MetricsStore
@@ -200,20 +202,30 @@ class DashboardServer:
             metrics_dir=self.metrics_dir
         )
 
+        # WebSocket connections tracking
+        self.websockets: Set[WebSocketResponse] = set()
+        self.broadcast_task: Optional[asyncio.Task] = None
+        self.broadcast_interval = 5  # seconds
+
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
 
         # Register routes
         self._setup_routes()
 
+        # Setup WebSocket broadcasting
+        self.app.on_startup.append(self._start_broadcast)
+        self.app.on_cleanup.append(self._cleanup_websockets)
+
         logger.info(f"Dashboard server initialized for project: {project_name}")
         logger.info(f"Metrics directory: {self.metrics_dir}")
 
     def _setup_routes(self):
-        """Register HTTP routes."""
+        """Register HTTP routes and WebSocket endpoint."""
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/api/metrics', self.get_metrics)
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
+        self.app.router.add_get('/ws', self.websocket_handler)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
@@ -355,8 +367,129 @@ class DashboardServer:
                 content_type='application/json'
             )
 
+    async def websocket_handler(self, request: Request) -> WebSocketResponse:
+        """WebSocket endpoint for real-time metrics streaming.
+
+        Accepts WebSocket connections and broadcasts metrics updates to all connected clients.
+        Clients receive JSON-formatted metrics data every 5 seconds.
+
+        Returns:
+            WebSocketResponse configured for metrics streaming
+        """
+        ws = WebSocketResponse()
+        await ws.prepare(request)
+
+        # Add to active connections
+        self.websockets.add(ws)
+        client_id = id(ws)
+        logger.info(f"WebSocket client connected: {client_id} (total: {len(self.websockets)})")
+
+        try:
+            # Send initial metrics immediately
+            try:
+                state = self.store.load()
+                await ws.send_json({
+                    'type': 'metrics_update',
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'data': state
+                })
+            except Exception as e:
+                logger.error(f"Error sending initial metrics to WebSocket {client_id}: {e}")
+
+            # Listen for client messages (mostly for ping/pong and close)
+            async for msg in ws:
+                if msg.type == WSMsgType.TEXT:
+                    # Handle client messages (e.g., ping)
+                    if msg.data == 'ping':
+                        await ws.send_str('pong')
+                elif msg.type == WSMsgType.ERROR:
+                    logger.error(f"WebSocket {client_id} error: {ws.exception()}")
+                    break
+                elif msg.type == WSMsgType.CLOSE:
+                    logger.info(f"WebSocket {client_id} closed by client")
+                    break
+
+        except Exception as e:
+            logger.error(f"WebSocket {client_id} error: {e}")
+        finally:
+            # Remove from active connections
+            self.websockets.discard(ws)
+            logger.info(f"WebSocket client disconnected: {client_id} (remaining: {len(self.websockets)})")
+
+        return ws
+
+    async def _broadcast_metrics(self):
+        """Periodically broadcast metrics to all connected WebSocket clients."""
+        while True:
+            try:
+                await asyncio.sleep(self.broadcast_interval)
+
+                if not self.websockets:
+                    continue
+
+                # Load current metrics
+                try:
+                    state = self.store.load()
+                except Exception as e:
+                    logger.error(f"Error loading metrics for broadcast: {e}")
+                    continue
+
+                # Prepare broadcast message
+                message = {
+                    'type': 'metrics_update',
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'data': state
+                }
+
+                # Broadcast to all connected clients
+                disconnected = set()
+                for ws in self.websockets:
+                    try:
+                        await ws.send_json(message)
+                    except Exception as e:
+                        logger.error(f"Error broadcasting to WebSocket {id(ws)}: {e}")
+                        disconnected.add(ws)
+
+                # Remove disconnected clients
+                self.websockets -= disconnected
+                if disconnected:
+                    logger.info(f"Removed {len(disconnected)} disconnected WebSocket clients")
+
+            except asyncio.CancelledError:
+                logger.info("Metrics broadcast task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in broadcast loop: {e}")
+
+    async def _start_broadcast(self, app):
+        """Start the periodic metrics broadcast task."""
+        self.broadcast_task = asyncio.create_task(self._broadcast_metrics())
+        logger.info(f"WebSocket broadcast started (interval: {self.broadcast_interval}s)")
+
+    async def _cleanup_websockets(self, app):
+        """Clean up all WebSocket connections on shutdown."""
+        logger.info("Cleaning up WebSocket connections...")
+
+        # Cancel broadcast task
+        if self.broadcast_task:
+            self.broadcast_task.cancel()
+            try:
+                await self.broadcast_task
+            except asyncio.CancelledError:
+                pass
+
+        # Close all active connections
+        for ws in self.websockets:
+            try:
+                await ws.close(code=1001, message=b'Server shutting down')
+            except Exception as e:
+                logger.error(f"Error closing WebSocket {id(ws)}: {e}")
+
+        self.websockets.clear()
+        logger.info("WebSocket cleanup complete")
+
     def run(self):
-        """Start the HTTP server.
+        """Start the HTTP server with WebSocket support.
 
         Runs the aiohttp application and blocks until server is stopped.
         """
@@ -365,6 +498,11 @@ class DashboardServer:
         logger.info(f"  GET  {self.host}:{self.port}/health")
         logger.info(f"  GET  {self.host}:{self.port}/api/metrics")
         logger.info(f"  GET  {self.host}:{self.port}/api/agents/<name>")
+        logger.info(f"  WS   ws://{self.host}:{self.port}/ws")
+        logger.info("")
+        logger.info("WebSocket Real-Time Updates:")
+        logger.info(f"  Broadcast interval: {self.broadcast_interval}s")
+        logger.info(f"  Auto-reconnect supported with exponential backoff")
         logger.info("")
         logger.info("A2UI Component Integration:")
         logger.info("  Components: TaskCard, ProgressRing, ActivityItem, ErrorCard")
