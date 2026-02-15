@@ -1,0 +1,29 @@
+Agent Status Dashboard CLI
+Metrics file: 
+/Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboar
+d/.agent_metrics.json
+╭─────────────────────────── Agent Status Dashboard ───────────────────────────╮
+│ Project: my-project                                                          │
+│ Last Updated: 2026-02-15 01:23:58 UTC                                        │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────────────────────────╮╭─── Dashboard Metrics ───╮
+│                   Agent Status                    ││ Active Tasks: 0         │
+│ ┏━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━┓ ││                         │
+│ ┃ Agent   ┃ Sta… ┃ Current Task           ┃ Du… ┃ ││ Recent Completions:     │
+│ ┡━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━┩ ││   ✓ coding: AI-TEST     │
+│ │ coding  │ Idle │ Waiting                │ 1h  │ ││   ✓ coding: AI-TEST     │
+│ │         │      │                        │ ago │ ││   ✓ coding: AI-TEST     │
+│ │ github  │ Idle │ Waiting                │ 4h  │ ││   ✓ coding: AI-TEST     │
+│ │         │      │                        │ ago │ ││   ✓ github: AI-46       │
+│ │ linear  │ Idle │ Waiting                │ 4h  │ ││                         │
+│ │         │      │                        │ ago │ ││ System Load:            │
+│ └─────────┴──────┴────────────────────────┴─────┘ ││ [yellow]Medium[/yellow] │
+│                                                   ││ (10 sessions, 24,300    │
+│                                                   ││ tokens)                 │
+│                                                   ││                         │
+│                                                   ││                         │
+│                                                   ││                         │
+│                                                   ││                         │
+│                                                   ││                         │
+╰───────────────────────────────────────────────────╯╰─────────────────────────╯

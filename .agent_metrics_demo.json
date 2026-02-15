@@ -1,0 +1,292 @@
+{
+  "version": 1,
+  "project_name": "Agent Status Dashboard Demo",
+  "created_at": "2026-02-14T00:00:00Z",
+  "updated_at": "2026-02-15T01:57:38.384881+00:00",
+  "total_sessions": 12,
+  "total_tokens": 45000,
+  "total_cost_usd": 0.45,
+  "total_duration_seconds": 1200.0,
+  "agents": {
+    "coding": {
+      "agent_name": "coding",
+      "total_invocations": 20,
+      "successful_invocations": 19,
+      "failed_invocations": 1,
+      "total_tokens": 30000,
+      "total_cost_usd": 0.3,
+      "total_duration_seconds": 800.0,
+      "commits_made": 5,
+      "prs_created": 2,
+      "prs_merged": 1,
+      "files_created": 15,
+      "files_modified": 8,
+      "lines_added": 450,
+      "lines_removed": 120,
+      "tests_written": 10,
+      "issues_created": 0,
+      "issues_completed": 3,
+      "messages_sent": 0,
+      "reviews_completed": 0,
+      "success_rate": 0.95,
+      "avg_duration_seconds": 40.0,
+      "avg_tokens_per_call": 1500.0,
+      "cost_per_success_usd": 0.0158,
+      "xp": 950,
+      "level": 3,
+      "current_streak": 19,
+      "best_streak": 19,
+      "achievements": [
+        "first_blood",
+        "century_club"
+      ],
+      "strengths": [
+        "fast_execution",
+        "high_success_rate"
+      ],
+      "weaknesses": [],
+      "recent_events": [
+        "evt-1",
+        "evt-2",
+        "evt-3"
+      ],
+      "last_error": "",
+      "last_active": "2026-02-15T01:56:53.384881+00:00"
+    },
+    "github": {
+      "agent_name": "github",
+      "total_invocations": 8,
+      "successful_invocations": 8,
+      "failed_invocations": 0,
+      "total_tokens": 10000,
+      "total_cost_usd": 0.1,
+      "total_duration_seconds": 200.0,
+      "commits_made": 5,
+      "prs_created": 3,
+      "prs_merged": 2,
+      "files_created": 0,
+      "files_modified": 0,
+      "lines_added": 0,
+      "lines_removed": 0,
+      "tests_written": 0,
+      "issues_created": 0,
+      "issues_completed": 0,
+      "messages_sent": 0,
+      "reviews_completed": 0,
+      "success_rate": 1.0,
+      "avg_duration_seconds": 25.0,
+      "avg_tokens_per_call": 1250.0,
+      "cost_per_success_usd": 0.0125,
+      "xp": 800,
+      "level": 2,
+      "current_streak": 8,
+      "best_streak": 8,
+      "achievements": [
+        "first_blood"
+      ],
+      "strengths": [
+        "perfect_accuracy",
+        "low_cost"
+      ],
+      "weaknesses": [],
+      "recent_events": [
+        "evt-4"
+      ],
+      "last_error": "",
+      "last_active": "2026-02-15T00:57:38.384881+00:00"
+    },
+    "linear": {
+      "agent_name": "linear",
+      "total_invocations": 5,
+      "successful_invocations": 3,
+      "failed_invocations": 2,
+      "total_tokens": 5000,
+      "total_cost_usd": 0.05,
+      "total_duration_seconds": 200.0,
+      "commits_made": 0,
+      "prs_created": 0,
+      "prs_merged": 0,
+      "files_created": 0,
+      "files_modified": 0,
+      "lines_added": 0,
+      "lines_removed": 0,
+      "tests_written": 0,
+      "issues_created": 5,
+      "issues_completed": 3,
+      "messages_sent": 0,
+      "reviews_completed": 0,
+      "success_rate": 0.6,
+      "avg_duration_seconds": 40.0,
+      "avg_tokens_per_call": 1000.0,
+      "cost_per_success_usd": 0.0167,
+      "xp": 300,
+      "level": 1,
+      "current_streak": 1,
+      "best_streak": 2,
+      "achievements": [],
+      "strengths": [],
+      "weaknesses": [
+        "high_error_rate"
+      ],
+      "recent_events": [
+        "evt-5",
+        "evt-6"
+      ],
+      "last_error": "API timeout",
+      "last_active": "2026-02-15T01:56:53.384881+00:00"
+    }
+  },
+  "events": [
+    {
+      "event_id": "evt-1",
+      "agent_name": "coding",
+      "session_id": "sess-1",
+      "ticket_key": "AI-54",
+      "started_at": "2026-02-15T01:56:53.384881+00:00",
+      "ended_at": "2026-02-15T01:56:53.384881+00:00",
+      "duration_seconds": 35.0,
+      "status": "success",
+      "input_tokens": 2000,
+      "output_tokens": 3000,
+      "total_tokens": 5000,
+      "estimated_cost_usd": 0.05,
+      "artifacts": [
+        "file:scripts/dashboard.py",
+        "file:tests/test_dashboard.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "evt-2",
+      "agent_name": "coding",
+      "session_id": "sess-1",
+      "ticket_key": "AI-53",
+      "started_at": "2026-02-15T01:56:53.384881+00:00",
+      "ended_at": "2026-02-15T01:56:53.384881+00:00",
+      "duration_seconds": 28.0,
+      "status": "success",
+      "input_tokens": 1500,
+      "output_tokens": 2500,
+      "total_tokens": 4000,
+      "estimated_cost_usd": 0.04,
+      "artifacts": [
+        "file:artifact_detector.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "evt-3",
+      "agent_name": "coding",
+      "session_id": "sess-2",
+      "ticket_key": "AI-52",
+      "started_at": "2026-02-15T01:56:53.384881+00:00",
+      "ended_at": "2026-02-15T01:56:53.384881+00:00",
+      "duration_seconds": 42.0,
+      "status": "success",
+      "input_tokens": 1800,
+      "output_tokens": 2200,
+      "total_tokens": 4000,
+      "estimated_cost_usd": 0.04,
+      "artifacts": [
+        "file:token_tracker.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "evt-4",
+      "agent_name": "github",
+      "session_id": "sess-1",
+      "ticket_key": "AI-54",
+      "started_at": "2026-02-15T00:57:38.384881+00:00",
+      "ended_at": "2026-02-15T00:57:38.384881+00:00",
+      "duration_seconds": 15.0,
+      "status": "success",
+      "input_tokens": 500,
+      "output_tokens": 500,
+      "total_tokens": 1000,
+      "estimated_cost_usd": 0.01,
+      "artifacts": [
+        "commit:abc123",
+        "pr:created:#54"
+      ],
+      "error_message": "",
+      "model_used": "claude-haiku-4-5"
+    },
+    {
+      "event_id": "evt-5",
+      "agent_name": "linear",
+      "session_id": "sess-2",
+      "ticket_key": "AI-55",
+      "started_at": "2026-02-15T01:56:53.384881+00:00",
+      "ended_at": "2026-02-15T01:56:53.384881+00:00",
+      "duration_seconds": 30.0,
+      "status": "success",
+      "input_tokens": 400,
+      "output_tokens": 600,
+      "total_tokens": 1000,
+      "estimated_cost_usd": 0.01,
+      "artifacts": [
+        "issue:AI-55"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "evt-6",
+      "agent_name": "linear",
+      "session_id": "sess-3",
+      "ticket_key": "AI-56",
+      "started_at": "2026-02-15T01:56:53.384881+00:00",
+      "ended_at": "2026-02-15T01:56:53.384881+00:00",
+      "duration_seconds": 25.0,
+      "status": "error",
+      "input_tokens": 300,
+      "output_tokens": 200,
+      "total_tokens": 500,
+      "estimated_cost_usd": 0.005,
+      "artifacts": [],
+      "error_message": "API timeout",
+      "model_used": "claude-sonnet-4-5"
+    }
+  ],
+  "sessions": [
+    {
+      "session_id": "sess-1",
+      "session_number": 1,
+      "session_type": "initializer",
+      "started_at": "2026-02-15T01:56:53.384881+00:00",
+      "ended_at": "2026-02-15T01:56:53.384881+00:00",
+      "status": "complete",
+      "agents_invoked": [
+        "coding",
+        "github"
+      ],
+      "total_tokens": 10000,
+      "total_cost_usd": 0.1,
+      "tickets_worked": [
+        "AI-54"
+      ]
+    },
+    {
+      "session_id": "sess-2",
+      "session_number": 2,
+      "session_type": "continuation",
+      "started_at": "2026-02-15T01:56:53.384881+00:00",
+      "ended_at": "2026-02-15T01:56:53.384881+00:00",
+      "status": "complete",
+      "agents_invoked": [
+        "coding",
+        "linear"
+      ],
+      "total_tokens": 8000,
+      "total_cost_usd": 0.08,
+      "tickets_worked": [
+        "AI-52",
+        "AI-55"
+      ]
+    }
+  ]
+}

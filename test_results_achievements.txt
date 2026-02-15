@@ -1,0 +1,49 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard
+configfile: pyproject.toml
+plugins: asyncio-1.2.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 38 items
+
+tests/test_achievements.py::TestAchievementDefinitions::test_all_achievements_have_icons PASSED [  2%]
+tests/test_achievements.py::TestAchievementDefinitions::test_all_achievements_have_names PASSED [  5%]
+tests/test_achievements.py::TestAchievementDefinitions::test_all_achievements_have_descriptions PASSED [  7%]
+tests/test_achievements.py::TestAchievementDefinitions::test_achievement_consistency PASSED [ 10%]
+tests/test_achievements.py::TestAchievementDefinitions::test_achievement_icons_are_emoji PASSED [ 13%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_achievements_grid_with_achievements PASSED [ 15%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_achievements_grid_no_achievements PASSED [ 18%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_achievements_grid_includes_agent_info PASSED [ 21%]
+tests/test_achievements.py::TestAchievementRenderer::test_achievement_grid_counts_unlocked_correctly PASSED [ 23%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_all_agents_achievements PASSED [ 26%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_all_agents_achievements_empty PASSED [ 28%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_achievement_detail_valid_achievement PASSED [ 31%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_achievement_detail_invalid_achievement PASSED [ 34%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_achievement_detail_all_valid_achievements PASSED [ 36%]
+tests/test_achievements.py::TestAchievementRenderer::test_create_initializing_layout PASSED [ 39%]
+tests/test_achievements.py::TestAchievementRenderer::test_progress_bar_creation PASSED [ 42%]
+tests/test_achievements.py::TestAchievementRenderer::test_progress_bar_accurate_filled PASSED [ 44%]
+tests/test_achievements.py::TestMetricsFileMonitor::test_load_metrics_valid_file PASSED [ 47%]
+tests/test_achievements.py::TestMetricsFileMonitor::test_load_metrics_nonexistent_file PASSED [ 50%]
+tests/test_achievements.py::TestMetricsFileMonitor::test_load_metrics_invalid_json PASSED [ 52%]
+tests/test_achievements.py::TestMetricsFileMonitor::test_has_changed_detects_modification PASSED [ 55%]
+tests/test_achievements.py::TestMetricsFileMonitor::test_has_changed_nonexistent_file PASSED [ 57%]
+tests/test_achievements.py::TestMetricsFileFinding::test_find_metrics_file_with_explicit_dir PASSED [ 60%]
+tests/test_achievements.py::TestMetricsFileFinding::test_find_metrics_file_default PASSED [ 63%]
+tests/test_achievements.py::TestAchievementFiltering::test_filter_locked_vs_unlocked PASSED [ 65%]
+tests/test_achievements.py::TestAchievementFiltering::test_invalid_achievement_ids_ignored PASSED [ 68%]
+tests/test_achievements.py::TestIntegrationAchievementDisplay::test_integration_render_single_agent_achievements PASSED [ 71%]
+tests/test_achievements.py::TestIntegrationAchievementDisplay::test_integration_render_all_agents_achievements PASSED [ 73%]
+tests/test_achievements.py::TestIntegrationAchievementDisplay::test_integration_agent_with_many_achievements PASSED [ 76%]
+tests/test_achievements.py::TestIntegrationAchievementDisplay::test_integration_agent_with_few_achievements PASSED [ 78%]
+tests/test_achievements.py::TestIntegrationAchievementDisplay::test_integration_metrics_file_round_trip PASSED [ 81%]
+tests/test_achievements.py::TestAchievementIcons::test_all_achievement_icons_are_single_emoji PASSED [ 84%]
+tests/test_achievements.py::TestAchievementIcons::test_achievement_icons_are_different PASSED [ 86%]
+tests/test_achievements.py::TestAchievementIcons::test_first_blood_icon PASSED [ 89%]
+tests/test_achievements.py::TestAchievementIcons::test_century_club_icon PASSED [ 92%]
+tests/test_achievements.py::TestErrorHandling::test_renderer_with_missing_agent_field PASSED [ 94%]
+tests/test_achievements.py::TestErrorHandling::test_renderer_with_empty_achievements_list PASSED [ 97%]
+tests/test_achievements.py::TestErrorHandling::test_achievement_detail_with_nonexistent_id PASSED [100%]
+
+============================== 38 passed in 0.19s ==============================
