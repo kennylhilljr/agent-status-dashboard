@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "project_name": "AI Agent Status Dashboard",
+  "created_at": "2026-02-14T00:00:00Z",
+  "updated_at": "2026-02-15T02:42:45.919206+00:00",
+  "agents": {
+    "coding": {
+      "agent_name": "coding",
+      "xp": 2500,
+      "level": 5,
+      "total_invocations": 150,
+      "successful_invocations": 150,
+      "success_rate": 1.0,
+      "achievements": [
+        "first_blood",
+        "century_club",
+        "perfect_day",
+        "speed_demon",
+        "marathon",
+        "polyglot",
+        "streak_10",
+        "streak_25"
+      ]
+    },
+    "github": {
+      "agent_name": "github",
+      "xp": 1200,
+      "level": 3,
+      "total_invocations": 50,
+      "successful_invocations": 50,
+      "success_rate": 1.0,
+      "achievements": [
+        "first_blood",
+        "speed_demon"
+      ]
+    },
+    "testing": {
+      "agent_name": "testing",
+      "xp": 400,
+      "level": 1,
+      "total_invocations": 20,
+      "successful_invocations": 12,
+      "success_rate": 0.6,
+      "achievements": [
+        "first_blood"
+      ]
+    },
+    "analysis": {
+      "agent_name": "analysis",
+      "xp": 0,
+      "level": 1,
+      "total_invocations": 0,
+      "successful_invocations": 0,
+      "success_rate": 0.0,
+      "achievements": []
+    }
+  }
+}
