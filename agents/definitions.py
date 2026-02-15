@@ -4,8 +4,14 @@ ChatGPT, Gemini, Groq, KIMI, and Windsurf for multi-AI orchestration.
 """
 
 import os
+import sys
 from pathlib import Path
-from typing import Final, Literal, NamedTuple, TypeGuard
+from typing import Final, Literal, NamedTuple
+
+if sys.version_info >= (3, 10):
+    from typing import TypeGuard
+else:
+    from typing_extensions import TypeGuard
 
 from arcade_config import (
     get_coding_tools,
