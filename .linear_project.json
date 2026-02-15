@@ -94,6 +94,8 @@
   "updated_at": "2026-02-14T23:12:00Z",
   "team_id": "a0ee7ae0-2ad9-4272-a99a-0fe1e2f84942",
   "team_name": "Ai-cli-macz",
+  "github_repo": "https://github.com/kennylhilljr/agent-status-dashboard",
+  "github_repo_name": "kennylhilljr/agent-status-dashboard",
   "last_verification_status": "pass",
   "tickets_since_verification": 0
 }
