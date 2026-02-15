@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Status Dashboard</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+
+        .refresh-info {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .refresh-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        /* Card Styles (Adapted from A2UI) */
+        .card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* TaskCard Component (Adapted from A2UI) */
+        .task-card {
+            cursor: pointer;
+        }
+
+        .task-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border: 1px solid;
+        }
+
+        .status-completed {
+            background: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .status-in-progress {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .status-pending {
+            background: rgba(148, 163, 184, 0.1);
+            color: #94a3b8;
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .task-description {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+
+        .task-metadata {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        /* ProgressRing Component (Adapted from A2UI) */
+        .progress-ring-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .progress-ring {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .progress-ring svg {
+            transform: rotate(-90deg);
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+
+        .progress-percentage {
+            position: absolute;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .progress-percentage-symbol {
+            font-size: 1.5rem;
+            color: #94a3b8;
+        }
+
+        .progress-metrics {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .progress-metric {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .progress-metric:hover {
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .metric-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #cbd5e1;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #f1f5f9;
+        }
+
+        /* ActivityItem Component (Adapted from A2UI) */
+        .activity-feed {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .activity-feed::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .activity-feed::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 4px;
+        }
+
+        .activity-feed::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 4px;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .activity-item:hover {
+            background: rgba(15, 23, 42, 0.7);
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .activity-timeline {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .activity-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.8);
+        }
+
+        .activity-line {
+            width: 2px;
+            height: 40px;
+            background: rgba(148, 163, 184, 0.2);
+            margin-top: 4px;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+
+        .activity-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .activity-time {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .activity-description {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        /* ErrorCard Component (Adapted from A2UI) */
+        .error-card {
+            border-left: 4px solid;
+        }
+
+        .error-severity-info {
+            border-left-color: #60a5fa;
+        }
+
+        .error-severity-warning {
+            border-left-color: #fbbf24;
+        }
+
+        .error-severity-error {
+            border-left-color: #ef4444;
+        }
+
+        .error-severity-critical {
+            border-left-color: #a855f7;
+        }
+
+        .error-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .error-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .error-severity-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: 1px solid;
+        }
+
+        .severity-info {
+            background: rgba(96, 165, 250, 0.1);
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.3);
+        }
+
+        .severity-warning {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border-color: rgba(251, 191, 36, 0.3);
+        }
+
+        .severity-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .severity-critical {
+            background: rgba(168, 85, 247, 0.1);
+            color: #a855f7;
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .error-message {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        .chart-large {
+            height: 400px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: #64748b;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(148, 163, 184, 0.2);
+            border-top-color: #60a5fa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error State */
+        .error-state {
+            padding: 40px;
+            text-align: center;
+            color: #ef4444;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .chart-container {
+                height: 250px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Agent Status Dashboard</h1>
+            <p>Real-time monitoring of autonomous agent performance</p>
+            <div class="refresh-info">
+                <div class="refresh-indicator"></div>
+                <span>Auto-refresh every 30 seconds</span>
+                <span id="last-update"></span>
+            </div>
+        </div>
+
+        <!-- Global Stats -->
+        <div class="stats-grid" id="stats-grid">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading dashboard...</p>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Agent Cards -->
+            <div id="agent-cards" class="dashboard-section"></div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="dashboard-grid">
+            <!-- Performance Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        Agent Success Rates
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="success-rate-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- XP Progression Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        XP & Level Progression
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="xp-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity & Performance Charts -->
+        <div class="dashboard-grid">
+            <!-- Activity Timeline Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Recent Activity
+                    </h2>
+                </div>
+                <div class="activity-feed" id="activity-feed">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading activity...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Metrics Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                        </svg>
+                        Agent Performance Overview
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost & Efficiency Charts -->
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Cost Analysis
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cost-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Invocation Statistics
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="invocation-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://localhost:8080';
+        const REFRESH_INTERVAL = 30000; // 30 seconds
+        let refreshTimer;
+        let charts = {};
+
+        // Utility Functions
+        function formatTime(date) {
+            return new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }).format(date);
+        }
+
+        function formatRelativeTime(timestamp) {
+            const now = new Date();
+            const date = new Date(timestamp);
+            const diff = now - date;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (seconds < 60) return 'just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            return `${days}d ago`;
+        }
+
+        function getSuccessRateColor(rate) {
+            if (rate >= 0.9) return '#10b981';
+            if (rate >= 0.7) return '#f59e0b';
+            return '#ef4444';
+        }
+
+        function getProgressRingColor(percentage) {
+            if (percentage >= 80) return '#10b981';
+            if (percentage >= 50) return '#f59e0b';
+            return '#ef4444';
+        }
+
+        // API Functions
+        async function fetchMetrics() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/metrics`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+                showError('Failed to load dashboard data. Please ensure the server is running.');
+                return null;
+            }
+        }
+
+        // Render Functions
+        function renderStatsGrid(data) {
+            const statsGrid = document.getElementById('stats-grid');
+            const stats = [
+                { label: 'Total Sessions', value: data.total_sessions || 0, icon: '📊' },
+                { label: 'Total Agents', value: Object.keys(data.agents || {}).length, icon: '🤖' },
+                { label: 'Total Cost', value: `$${(data.total_cost_usd || 0).toFixed(2)}`, icon: '💰' },
+                { label: 'Total Tokens', value: (data.total_tokens || 0).toLocaleString(), icon: '🎫' }
+            ];
+
+            statsGrid.innerHTML = stats.map(stat => `
+                <div class="stat-card">
+                    <div class="stat-value">${stat.value}</div>
+                    <div class="stat-label">${stat.icon} ${stat.label}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderAgentCards(agents) {
+            const container = document.getElementById('agent-cards');
+            if (!agents || Object.keys(agents).length === 0) {
+                container.innerHTML = '<div class="loading"><p>No agents found</p></div>';
+                return;
+            }
+
+            container.innerHTML = Object.entries(agents).map(([name, agent]) => {
+                const successRate = agent.success_rate || 0;
+                const percentage = Math.round(successRate * 100);
+                const color = getProgressRingColor(percentage);
+                const status = percentage >= 80 ? 'completed' : percentage >= 50 ? 'in-progress' : 'pending';
+                const statusClass = percentage >= 80 ? 'status-completed' : percentage >= 50 ? 'status-in-progress' : 'status-pending';
+
+                // SVG circle calculations
+                const size = 160;
+                const strokeWidth = 12;
+                const radius = (size - strokeWidth) / 2;
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - (percentage / 100) * circumference;
+
+                return `
+                    <div class="card task-card" onclick="viewAgentDetails('${name}')">
+                        <div class="card-header">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 class="card-title">🤖 ${name}</h3>
+                                <span class="task-status-badge ${statusClass}">
+                                    Level ${agent.level || 1}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- ProgressRing Component -->
+                        <div class="progress-ring-container">
+                            <div class="progress-ring">
+                                <svg width="${size}" height="${size}" style="color: ${color};">
+                                    <circle cx="${size/2}" cy="${size/2}" r="${radius}"
+                                        stroke="rgba(148, 163, 184, 0.2)" stroke-width="${strokeWidth}" fill="none"/>
+                                    <circle cx="${size/2}" cy="${size/2}" r="${radius}"
+                                        stroke="currentColor" stroke-width="${strokeWidth}" fill="none"
+                                        stroke-linecap="round"
+                                        style="stroke-dasharray: ${circumference}; stroke-dashoffset: ${offset}; transition: all 1s ease;"/>
+                                </svg>
+                                <div class="progress-percentage" style="color: ${color};">
+                                    ${percentage}<span class="progress-percentage-symbol">%</span>
+                                </div>
+                            </div>
+
+                            <div class="progress-metrics">
+                                <div class="progress-metric">
+                                    <span class="metric-label">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Tasks Completed
+                                    </span>
+                                    <span class="metric-value">${agent.successful_invocations || 0}</span>
+                                </div>
+                                <div class="progress-metric">
+                                    <span class="metric-label">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        Files Modified
+                                    </span>
+                                    <span class="metric-value">${agent.files_modified || 0}</span>
+                                </div>
+                                <div class="progress-metric">
+                                    <span class="metric-label">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                        </svg>
+                                        Tests Written
+                                    </span>
+                                    <span class="metric-value">${agent.tests_written || 0}</span>
+                                </div>
+                                <div class="progress-metric">
+                                    <span class="metric-label">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                        XP Earned
+                                    </span>
+                                    <span class="metric-value">${agent.xp || 0}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="task-metadata">
+                            <span>💸 $${(agent.total_cost_usd || 0).toFixed(2)}</span>
+                            <span>🔥 ${agent.current_streak || 0} streak</span>
+                            <span>⏱️ ${Math.round(agent.avg_duration_seconds || 0)}s avg</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderActivityFeed(events) {
+            const feed = document.getElementById('activity-feed');
+            if (!events || events.length === 0) {
+                feed.innerHTML = '<div class="loading"><p>No recent activity</p></div>';
+                return;
+            }
+
+            const eventTypeColors = {
+                'task_started': '#60a5fa',
+                'task_completed': '#10b981',
+                'file_modified': '#a855f7',
+                'command_executed': '#f59e0b',
+                'test_run': '#8b5cf6',
+                'decision_made': '#fbbf24',
+                'error_occurred': '#ef4444',
+                'milestone_reached': '#10b981'
+            };
+
+            const eventTypeIcons = {
+                'task_started': '▶',
+                'task_completed': '✓',
+                'file_modified': '📝',
+                'command_executed': '⚙',
+                'test_run': '🧪',
+                'decision_made': '🎯',
+                'error_occurred': '⚠',
+                'milestone_reached': '🏁'
+            };
+
+            // Take last 10 events
+            const recentEvents = events.slice(-10).reverse();
+
+            feed.innerHTML = recentEvents.map((event, index) => {
+                const eventType = event.event_type || 'task_completed';
+                const color = eventTypeColors[eventType] || '#60a5fa';
+                const icon = eventTypeIcons[eventType] || '•';
+                const showLine = index < recentEvents.length - 1;
+
+                return `
+                    <div class="activity-item">
+                        <div class="activity-timeline">
+                            <div class="activity-dot" style="background: ${color};">
+                                ${icon}
+                            </div>
+                            ${showLine ? '<div class="activity-line"></div>' : ''}
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-header">
+                                <div class="activity-title">${event.agent_name || 'Unknown'}</div>
+                                <div class="activity-time">${formatRelativeTime(event.timestamp)}</div>
+                            </div>
+                            <div class="activity-description">
+                                ${event.event_type || 'Activity'} - ${event.description || event.outcome || 'No description'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Chart Functions
+        function createSuccessRateChart(agents) {
+            const ctx = document.getElementById('success-rate-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const successRates = agentNames.map(name => (agents[name].success_rate || 0) * 100);
+
+            if (charts.successRate) charts.successRate.destroy();
+
+            charts.successRate = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: agentNames,
+                    datasets: [{
+                        label: 'Success Rate (%)',
+                        data: successRates,
+                        backgroundColor: successRates.map(rate =>
+                            rate >= 90 ? 'rgba(16, 185, 129, 0.8)' :
+                            rate >= 70 ? 'rgba(245, 158, 11, 0.8)' :
+                            'rgba(239, 68, 68, 0.8)'
+                        ),
+                        borderColor: successRates.map(rate =>
+                            rate >= 90 ? '#10b981' :
+                            rate >= 70 ? '#f59e0b' :
+                            '#ef4444'
+                        ),
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: { color: '#94a3b8', callback: value => value + '%' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createXPChart(agents) {
+            const ctx = document.getElementById('xp-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const xpData = agentNames.map(name => agents[name].xp || 0);
+            const levelData = agentNames.map(name => agents[name].level || 1);
+
+            if (charts.xp) charts.xp.destroy();
+
+            charts.xp = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: agentNames,
+                    datasets: [
+                        {
+                            label: 'XP',
+                            data: xpData,
+                            borderColor: '#60a5fa',
+                            backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Level',
+                            data: levelData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8', padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'XP', color: '#60a5fa' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' },
+                            title: { display: true, text: 'Level', color: '#10b981' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createPerformanceChart(agents) {
+            const ctx = document.getElementById('performance-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const successData = agentNames.map(name => agents[name].successful_invocations || 0);
+            const failedData = agentNames.map(name => agents[name].failed_invocations || 0);
+
+            if (charts.performance) charts.performance.destroy();
+
+            charts.performance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: agentNames,
+                    datasets: [{
+                        label: 'Successful Invocations',
+                        data: successData,
+                        backgroundColor: [
+                            'rgba(96, 165, 250, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(168, 85, 247, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ],
+                        borderColor: [
+                            '#60a5fa', '#10b981', '#a855f7', '#f59e0b', '#ef4444'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12
+                        }
+                    }
+                }
+            });
+        }
+
+        function createCostChart(agents) {
+            const ctx = document.getElementById('cost-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const costData = agentNames.map(name => agents[name].total_cost_usd || 0);
+
+            if (charts.cost) charts.cost.destroy();
+
+            charts.cost = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: agentNames,
+                    datasets: [{
+                        label: 'Total Cost (USD)',
+                        data: costData,
+                        backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                        borderColor: '#f59e0b',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: ctx => '$' + ctx.parsed.y.toFixed(2)
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: value => '$' + value.toFixed(2)
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createInvocationChart(agents) {
+            const ctx = document.getElementById('invocation-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const totalInvocations = agentNames.map(name => agents[name].total_invocations || 0);
+            const successfulInvocations = agentNames.map(name => agents[name].successful_invocations || 0);
+            const failedInvocations = agentNames.map(name => agents[name].failed_invocations || 0);
+
+            if (charts.invocation) charts.invocation.destroy();
+
+            charts.invocation = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: agentNames,
+                    datasets: [
+                        {
+                            label: 'Successful',
+                            data: successfulInvocations,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderColor: '#10b981',
+                            borderWidth: 2,
+                            borderRadius: 8
+                        },
+                        {
+                            label: 'Failed',
+                            data: failedInvocations,
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: '#ef4444',
+                            borderWidth: 2,
+                            borderRadius: 8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8', padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: false,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            stacked: false,
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Main Update Function
+        async function updateDashboard() {
+            const data = await fetchMetrics();
+            if (!data) return;
+
+            // Update timestamp
+            document.getElementById('last-update').textContent =
+                `Updated at ${formatTime(new Date())}`;
+
+            // Render components
+            renderStatsGrid(data);
+            renderAgentCards(data.agents || {});
+            renderActivityFeed(data.events || []);
+
+            // Create charts
+            if (data.agents && Object.keys(data.agents).length > 0) {
+                createSuccessRateChart(data.agents);
+                createXPChart(data.agents);
+                createPerformanceChart(data.agents);
+                createCostChart(data.agents);
+                createInvocationChart(data.agents);
+            }
+        }
+
+        function showError(message) {
+            const statsGrid = document.getElementById('stats-grid');
+            statsGrid.innerHTML = `
+                <div class="error-state" style="grid-column: 1/-1;">
+                    <div class="card error-card error-severity-error">
+                        <div class="error-header">
+                            <div class="error-title">⚠️ Dashboard Error</div>
+                            <span class="error-severity-badge severity-error">ERROR</span>
+                        </div>
+                        <div class="error-message">${message}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function viewAgentDetails(agentName) {
+            console.log('Viewing details for agent:', agentName);
+            // Could implement modal or navigation to detail view
+            alert(`Agent Details: ${agentName}\n\nClick OK to view in browser console.`);
+            fetch(`${API_BASE_URL}/api/agents/${agentName}?include_events`)
+                .then(r => r.json())
+                .then(data => console.log('Agent Details:', data));
+        }
+
+        // Initialize Dashboard
+        async function init() {
+            console.log('Initializing Agent Status Dashboard...');
+            await updateDashboard();
+
+            // Set up auto-refresh
+            refreshTimer = setInterval(updateDashboard, REFRESH_INTERVAL);
+            console.log(`Auto-refresh enabled: every ${REFRESH_INTERVAL/1000}s`);
+        }
+
+        // Start when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshTimer) clearInterval(refreshTimer);
+            Object.values(charts).forEach(chart => chart && chart.destroy());
+        });
+    </script>
+</body>
+</html>
