@@ -9,40 +9,22 @@ Tests cover:
 """
 
 import os
-import socket
-import subprocess
-import sys
 import time
-import urllib.request
 from datetime import datetime
 from pathlib import Path
 
 import pytest
+from dashboard_server_process import dashboard_server
 from playwright.sync_api import Page, expect, sync_playwright
 
 from metrics import AgentProfile, DashboardState
 from metrics_store import MetricsStore
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-
-def _free_port() -> int:
-    """Ask the OS for a currently unused TCP port."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
-
-
-SERVER_PORT = _free_port()
-ORIGIN = f'http://localhost:{SERVER_PORT}'
-DASHBOARD_URL = f'{ORIGIN}/dashboard.html'
+DASHBOARD_SOURCE = (REPO_ROOT / 'dashboard.html').read_text()
 # dashboard.html hard-codes the server at localhost:8080; the page served to the
-# browser points at the test server's port instead.
-DASHBOARD_HTML = (REPO_ROOT / 'dashboard.html').read_text().replace(
-    'localhost:8080', f'localhost:{SERVER_PORT}'
-)
-assert f'localhost:{SERVER_PORT}' in DASHBOARD_HTML, "dashboard.html no longer uses localhost:8080"
+# browser is rewritten to point at the test server's port instead.
+assert 'localhost:8080' in DASHBOARD_SOURCE, "dashboard.html no longer uses localhost:8080"
 
 
 @pytest.fixture(scope="module")
@@ -128,51 +110,19 @@ def server_process(metrics_dir):
 
     store.save(state)
 
-    # Start server
-    process = subprocess.Popen(
-        [
-            sys.executable,
-            str(REPO_ROOT / 'dashboard_server.py'),
-            '--port', str(SERVER_PORT),
-            '--metrics-dir', str(test_dir),
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        cwd=test_dir,
-        # The dashboard page is served from ORIGIN, so the API must allow it.
-        env={**os.environ, 'CORS_ALLOWED_ORIGINS': ORIGIN},
-    )
+    # The dashboard page is served from http://localhost:<port>, so the API must
+    # allow that origin.
+    def server_env(port: int) -> dict[str, str]:
+        return {**os.environ, 'CORS_ALLOWED_ORIGINS': f'http://localhost:{port}'}
 
-    try:
-        # Wait (bounded) for the health endpoint to answer
-        deadline = time.monotonic() + 15
-        while True:
-            if process.poll() is not None:
-                output = process.stdout.read().decode(errors='replace')
-                raise RuntimeError(
-                    f"dashboard_server.py exited with code {process.returncode}:\n{output}"
-                )
-            try:
-                with urllib.request.urlopen(
-                    f'http://127.0.0.1:{SERVER_PORT}/health', timeout=1
-                ) as resp:
-                    if resp.status == 200:
-                        break
-            except OSError:
-                pass
-            if time.monotonic() > deadline:
-                raise RuntimeError("dashboard_server.py did not become ready within 15 seconds")
-            time.sleep(0.2)
+    with dashboard_server(test_dir, env_for_port=server_env) as port:
+        yield port
 
-        yield process
-    finally:
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-        process.stdout.close()
+
+@pytest.fixture(scope="module")
+def dashboard_url(server_process):
+    """URL the browser opens; served from the repository by browser_page."""
+    return f'http://localhost:{server_process}/dashboard.html'
 
 
 @pytest.fixture(scope="module")
@@ -209,22 +159,23 @@ def page(browser):
 
 
 @pytest.fixture
-def browser_page(page: Page):
+def browser_page(page: Page, server_process, dashboard_url):
     """Configure browser page for testing."""
     page.set_viewport_size({"width": 1920, "height": 1080})
     # dashboard_server.py only serves the API and WebSocket, so serve the dashboard
-    # page itself from the repository; API and WebSocket calls reach the real server.
+    # page itself from the repository; API and WebSocket calls reach the test server.
+    html = DASHBOARD_SOURCE.replace('localhost:8080', f'localhost:{server_process}')
     page.route(
-        DASHBOARD_URL,
-        lambda route: route.fulfill(body=DASHBOARD_HTML, content_type='text/html'),
+        dashboard_url,
+        lambda route: route.fulfill(body=html, content_type='text/html'),
     )
     return page
 
 
-def test_websocket_connection_established(browser_page: Page, server_process):
+def test_websocket_connection_established(browser_page: Page, dashboard_url):
     """Test WebSocket connection establishes successfully."""
     # Navigate to dashboard
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
 
     # Wait for page to load
     browser_page.wait_for_load_state('networkidle')
@@ -241,9 +192,9 @@ def test_websocket_connection_established(browser_page: Page, server_process):
     expect(status_text).to_contain_text('Live updates active', timeout=10000)
 
 
-def test_websocket_receives_initial_data(browser_page: Page, server_process):
+def test_websocket_receives_initial_data(browser_page: Page, dashboard_url):
     """Test WebSocket receives and displays initial metrics data."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for data to load
@@ -261,9 +212,9 @@ def test_websocket_receives_initial_data(browser_page: Page, server_process):
     expect(browser_page.locator('.stat-value').first).to_be_visible()
 
 
-def test_websocket_live_updates(browser_page: Page, server_process, metrics_dir):
+def test_websocket_live_updates(browser_page: Page, dashboard_url, metrics_dir):
     """Test WebSocket receives live updates."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for initial connection
@@ -290,9 +241,9 @@ def test_websocket_live_updates(browser_page: Page, server_process, metrics_dir)
     expect(level_badge).to_be_visible(timeout=5000)
 
 
-def test_websocket_connection_status_indicator(browser_page: Page, server_process):
+def test_websocket_connection_status_indicator(browser_page: Page, dashboard_url):
     """Test connection status indicator updates correctly."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
 
     # Initially should show connecting
     status = browser_page.locator('#connection-status')
@@ -305,9 +256,9 @@ def test_websocket_connection_status_indicator(browser_page: Page, server_proces
     expect(indicator).to_be_visible()
 
 
-def test_websocket_updates_timestamp(browser_page: Page, server_process):
+def test_websocket_updates_timestamp(browser_page: Page, dashboard_url):
     """Test that update timestamp is displayed and updates."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for initial update
@@ -319,9 +270,9 @@ def test_websocket_updates_timestamp(browser_page: Page, server_process):
     expect(last_update).to_contain_text('Updated at', timeout=10000)
 
 
-def test_websocket_multiple_updates(browser_page: Page, server_process, metrics_dir):
+def test_websocket_multiple_updates(browser_page: Page, dashboard_url, metrics_dir):
     """Test WebSocket handles multiple sequential updates."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for connection
@@ -346,9 +297,9 @@ def test_websocket_multiple_updates(browser_page: Page, server_process, metrics_
     assert len(stats) > 0
 
 
-def test_websocket_dashboard_charts_update(browser_page: Page, server_process):
+def test_websocket_dashboard_charts_update(browser_page: Page, dashboard_url):
     """Test that charts update with WebSocket data."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for charts to render
@@ -363,9 +314,9 @@ def test_websocket_dashboard_charts_update(browser_page: Page, server_process):
     assert chart_count >= 5  # We have 5 charts in dashboard
 
 
-def test_websocket_activity_feed_updates(browser_page: Page, server_process):
+def test_websocket_activity_feed_updates(browser_page: Page, dashboard_url):
     """Test that activity feed shows data from WebSocket."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for data
@@ -376,9 +327,9 @@ def test_websocket_activity_feed_updates(browser_page: Page, server_process):
     expect(activity_items.first).to_be_visible(timeout=10000)
 
 
-def test_websocket_page_ready_without_manual_refresh(browser_page: Page, server_process):
+def test_websocket_page_ready_without_manual_refresh(browser_page: Page, dashboard_url):
     """Test that dashboard works without manual refresh - all via WebSocket."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
 
     # Wait for WebSocket connection
     expect(browser_page.locator('#connection-status.connected')).to_be_visible(timeout=10000)
@@ -397,9 +348,9 @@ def test_websocket_page_ready_without_manual_refresh(browser_page: Page, server_
     assert navigation_count == 0  # Normal navigation, not refresh
 
 
-def test_websocket_screenshot_evidence(browser_page: Page, server_process, tmp_path):
+def test_websocket_screenshot_evidence(browser_page: Page, dashboard_url, tmp_path):
     """Take screenshot evidence of WebSocket live updates working."""
-    browser_page.goto(DASHBOARD_URL)
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for connection and data
