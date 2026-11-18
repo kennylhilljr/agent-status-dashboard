@@ -21,23 +21,20 @@ Test coverage includes:
 
 import json
 import os
-import subprocess
 import sys
 import tempfile
 import threading
 import time
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from metrics import DashboardState, AgentEvent, AgentProfile, SessionSummary
-from metrics_store import MetricsStore, LockAcquisitionError, _file_lock
+from metrics import DashboardState
+from metrics_store import LockAcquisitionError, MetricsStore, _file_lock
 
 
 class TestAtomicWrites:
@@ -82,7 +79,7 @@ class TestAtomicWrites:
         store.save(sample_state)
 
         # Load the saved file
-        with open(store.metrics_path, 'r') as f:
+        with open(store.metrics_path) as f:
             loaded_data = json.load(f)
 
         # Verify data integrity
@@ -105,7 +102,7 @@ class TestAtomicWrites:
 
         # Verify backup exists and contains first version
         assert store.backup_path.exists()
-        with open(store.backup_path, 'r') as f:
+        with open(store.backup_path) as f:
             backup_data = json.load(f)
 
         assert backup_data["total_sessions"] == 1  # First version
@@ -156,7 +153,7 @@ class TestAtomicWrites:
         store.save(large_state)
 
         # Verify file was written correctly
-        with open(store.metrics_path, 'r') as f:
+        with open(store.metrics_path) as f:
             loaded_data = json.load(f)
 
         assert len(loaded_data["events"]) == 500
@@ -229,7 +226,7 @@ class TestCorruptionRecovery:
         store.save(sample_state)
 
         # Corrupt the main file by removing required field
-        with open(store.metrics_path, 'r') as f:
+        with open(store.metrics_path) as f:
             data = json.load(f)
 
         del data["total_sessions"]  # Remove required field
@@ -247,7 +244,7 @@ class TestCorruptionRecovery:
         store.save(sample_state)
 
         # Corrupt the main file with wrong types
-        with open(store.metrics_path, 'r') as f:
+        with open(store.metrics_path) as f:
             data = json.load(f)
 
         data["agents"] = "not_a_dict"  # Should be dict
@@ -497,7 +494,7 @@ class TestConcurrentWrites:
             t.join()
 
         # File should be readable and valid
-        with open(store.metrics_path, 'r') as f:
+        with open(store.metrics_path) as f:
             data = json.load(f)
 
         # Should be valid JSON and have expected structure

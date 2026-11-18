@@ -6,20 +6,20 @@ agent detail views for multiple agents.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 import sys
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
-from agent_detail import AgentDetailRenderer, display_agent_detail
+from agent_detail import display_agent_detail
 from rich.console import Console
 
 
 def create_comprehensive_demo_metrics():
     """Create comprehensive demo metrics with realistic agent data."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     recent = (now - timedelta(seconds=45)).isoformat()
     old = (now - timedelta(hours=1)).isoformat()
 
@@ -276,7 +276,7 @@ def create_comprehensive_demo_metrics():
 
 def main():
     """Main demo function."""
-    console = Console()
+    Console()
 
     print("\n" + "=" * 100)
     print("AGENT DETAIL VIEW - DEMONSTRATION")

@@ -20,7 +20,7 @@ Achievements (12 total):
 """
 
 from datetime import datetime
-from typing import List
+
 from metrics import AgentEvent, AgentProfile
 
 
@@ -80,7 +80,7 @@ def check_century_club(profile: AgentProfile) -> bool:
     )
 
 
-def check_perfect_day(session_events: List[AgentEvent], agent_name: str, profile: AgentProfile) -> bool:
+def check_perfect_day(session_events: list[AgentEvent], agent_name: str, profile: AgentProfile) -> bool:
     """Check if agent has earned Perfect Day achievement.
 
     Awarded for 10+ invocations in one session with 0 errors.
@@ -117,7 +117,7 @@ def check_perfect_day(session_events: List[AgentEvent], agent_name: str, profile
     return all(e["status"] == "success" for e in agent_events)
 
 
-def check_speed_demon(recent_events: List[AgentEvent], profile: AgentProfile) -> bool:
+def check_speed_demon(recent_events: list[AgentEvent], profile: AgentProfile) -> bool:
     """Check if agent has earned Speed Demon achievement.
 
     Awarded for 5 consecutive completions under 30 seconds.
@@ -157,7 +157,7 @@ def check_speed_demon(recent_events: List[AgentEvent], profile: AgentProfile) ->
     )
 
 
-def check_comeback_kid(recent_events: List[AgentEvent], profile: AgentProfile) -> bool:
+def check_comeback_kid(recent_events: list[AgentEvent], profile: AgentProfile) -> bool:
     """Check if agent has earned Comeback Kid achievement.
 
     Awarded for success immediately after 3+ consecutive errors.
@@ -231,7 +231,7 @@ def check_big_spender(event: AgentEvent, profile: AgentProfile) -> bool:
     )
 
 
-def check_penny_pincher(all_events: List[AgentEvent], profile: AgentProfile) -> bool:
+def check_penny_pincher(all_events: list[AgentEvent], profile: AgentProfile) -> bool:
     """Check if agent has earned Penny Pincher achievement.
 
     Awarded for 50+ successful invocations with cost < $0.01 each.
@@ -291,7 +291,7 @@ def check_marathon(profile: AgentProfile) -> bool:
     )
 
 
-def check_polyglot(all_events: List[AgentEvent], profile: AgentProfile) -> bool:
+def check_polyglot(all_events: list[AgentEvent], profile: AgentProfile) -> bool:
     """Check if agent has earned Polyglot achievement.
 
     Awarded when agent is used across 5+ different ticket types.
@@ -412,9 +412,9 @@ def check_streak_25(profile: AgentProfile) -> bool:
 def check_all_achievements(
     profile: AgentProfile,
     current_event: AgentEvent,
-    all_agent_events: List[AgentEvent],
-    session_events: List[AgentEvent],
-) -> List[str]:
+    all_agent_events: list[AgentEvent],
+    session_events: list[AgentEvent],
+) -> list[str]:
     """Check all achievement conditions and return newly earned achievements.
 
     This is the main function that should be called after each agent invocation
@@ -565,7 +565,7 @@ def get_achievement_description(achievement_id: str) -> str:
     return descriptions[achievement_id]
 
 
-def get_all_achievement_ids() -> List[str]:
+def get_all_achievement_ids() -> list[str]:
     """Get list of all valid achievement IDs.
 
     Returns:

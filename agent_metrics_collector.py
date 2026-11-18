@@ -28,11 +28,10 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from metrics import AgentEvent, AgentProfile, DashboardState, SessionSummary
 from metrics_store import MetricsStore
-
 
 # Model pricing (USD per 1000 tokens)
 MODEL_PRICING = {
@@ -317,7 +316,7 @@ class AgentMetricsCollector:
         collector.end_session(session_id, status="complete")
     """
 
-    def __init__(self, project_name: str, metrics_dir: Optional[Path] = None):
+    def __init__(self, project_name: str, metrics_dir: Path | None = None):
         """Initialize the collector.
 
         Args:
@@ -411,7 +410,7 @@ class AgentMetricsCollector:
         agent_name: str,
         ticket_key: str,
         model_used: str,
-        session_id: Optional[str] = None
+        session_id: str | None = None
     ):
         """Context manager for tracking an agent delegation.
 

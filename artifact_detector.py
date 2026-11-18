@@ -14,7 +14,7 @@ identifying common patterns like git commands, file operations, Linear API calls
 """
 
 import re
-from typing import List, Literal
+from typing import Literal
 
 # Agent type definitions
 AgentType = Literal[
@@ -133,7 +133,7 @@ class ArtifactDetector:
         agent_name: str,
         tool_results: str,
         additional_context: str = ""
-    ) -> List[str]:
+    ) -> list[str]:
         """Detect artifacts from agent tool results and outputs.
 
         Args:
@@ -155,7 +155,7 @@ class ArtifactDetector:
             - "changes_requested:<pr_number>"
             - "tests_run:<count>"
         """
-        artifacts: List[str] = []
+        artifacts: list[str] = []
 
         # Get applicable patterns for this agent
         pattern_names = self._agent_patterns.get(agent_name, [])
@@ -223,7 +223,7 @@ class ArtifactDetector:
 
         return ""
 
-    def detect_from_bash_output(self, agent_name: str, bash_output: str) -> List[str]:
+    def detect_from_bash_output(self, agent_name: str, bash_output: str) -> list[str]:
         """Detect artifacts from Bash tool output (git commands, pytest, etc.).
 
         This is a specialized detection method for parsing common CLI tool outputs.
@@ -235,7 +235,7 @@ class ArtifactDetector:
         Returns:
             List of detected artifacts
         """
-        artifacts: List[str] = []
+        artifacts: list[str] = []
 
         # Detect git commits from git log output
         # Match both full line format and inline commit references
@@ -282,7 +282,7 @@ class ArtifactDetector:
         tool_name: str,
         tool_input: dict,
         tool_output: str
-    ) -> List[str]:
+    ) -> list[str]:
         """Detect artifacts based on specific tool invocations.
 
         This provides tool-specific detection logic for known tools.
@@ -296,7 +296,7 @@ class ArtifactDetector:
         Returns:
             List of detected artifacts
         """
-        artifacts: List[str] = []
+        artifacts: list[str] = []
 
         # Write tool - file creation
         if tool_name == "Write":

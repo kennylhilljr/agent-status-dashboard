@@ -29,17 +29,13 @@ Usage:
 
 import argparse
 import json
-import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple
 
 from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
-from rich.table import Table
 from rich.text import Text
 
 # Default paths
@@ -105,7 +101,7 @@ class AchievementRenderer:
         """
         self.console = console
 
-    def create_achievements_grid(self, agent_name: str, agent_data: Dict) -> Panel:
+    def create_achievements_grid(self, agent_name: str, agent_data: dict) -> Panel:
         """Create a grid display of all achievements for an agent.
 
         Args:
@@ -119,9 +115,9 @@ class AchievementRenderer:
         total_xp = agent_data.get("xp", 0)
 
         text = Text()
-        text.append(f"Agent: ", style="bold")
+        text.append("Agent: ", style="bold")
         text.append(f"{agent_name}\n", style="cyan bold")
-        text.append(f"XP: ", style="bold")
+        text.append("XP: ", style="bold")
         text.append(f"{total_xp}\n", style="yellow bold")
         text.append("\n", style="")
 
@@ -156,7 +152,7 @@ class AchievementRenderer:
                 icon = ACHIEVEMENT_ICONS[achievement_id]
                 name = ACHIEVEMENT_NAMES[achievement_id]
                 description = ACHIEVEMENT_DESCRIPTIONS[achievement_id]
-                text.append(f"🔒 ", style="dim")
+                text.append("🔒 ", style="dim")
                 text.append(f"{name}\n", style="dim")
                 text.append(f"   {description}\n", style="dim")
             text.append("\n", style="")
@@ -165,13 +161,13 @@ class AchievementRenderer:
         text.append("Summary\n", style="bold cyan")
         text.append("=" * 50 + "\n", style="dim cyan")
         text.append(f"Unlocked: {len(unlocked)}/12\n", style="green")
-        text.append(f"Progress: ", style="")
+        text.append("Progress: ", style="")
         progress_bar = self._create_progress_bar(len(unlocked), 12)
         text.append(f"{progress_bar}\n", style="cyan")
 
         return Panel(text, title=f"Achievements - {agent_name}", border_style="cyan")
 
-    def create_all_agents_achievements(self, agents: Dict[str, Dict]) -> Panel:
+    def create_all_agents_achievements(self, agents: dict[str, dict]) -> Panel:
         """Create achievement summary for all agents.
 
         Args:
@@ -233,7 +229,7 @@ class AchievementRenderer:
 
         text.append(f"{icon} {name}\n", style="bold yellow")
         text.append("=" * 50 + "\n", style="dim")
-        text.append(f"\nCondition:\n", style="bold")
+        text.append("\nCondition:\n", style="bold")
         text.append(f"{description}\n", style="white")
         text.append(f"\nAchievement ID: {achievement_id}\n", style="dim")
 
@@ -291,7 +287,7 @@ class MetricsFileMonitor:
         self.metrics_path = metrics_path
         self._last_modified_time = 0.0
 
-    def load_metrics(self) -> Optional[Dict]:
+    def load_metrics(self) -> dict | None:
         """Load metrics from file if it exists.
 
         Returns:
@@ -301,10 +297,10 @@ class MetricsFileMonitor:
             return None
 
         try:
-            with open(self.metrics_path, 'r', encoding='utf-8') as f:
+            with open(self.metrics_path, encoding='utf-8') as f:
                 data = json.load(f)
             return data
-        except (json.JSONDecodeError, IOError, OSError):
+        except (json.JSONDecodeError, OSError):
             return None
 
     def has_changed(self) -> bool:
@@ -321,13 +317,13 @@ class MetricsFileMonitor:
             if current_mtime != self._last_modified_time:
                 self._last_modified_time = current_mtime
                 return True
-        except (IOError, OSError):
+        except OSError:
             pass
 
         return False
 
 
-def find_metrics_file(metrics_dir: Optional[Path] = None) -> Path:
+def find_metrics_file(metrics_dir: Path | None = None) -> Path:
     """Find metrics file path.
 
     Searches in the following order:
@@ -484,7 +480,7 @@ def main():
 
     # Print startup information
     console = Console()
-    console.print(f"[cyan]Starting Achievement Display...[/cyan]")
+    console.print("[cyan]Starting Achievement Display...[/cyan]")
     console.print(f"[dim]Monitoring: {metrics_path}[/dim]")
     console.print(f"[dim]Refresh rate: {args.refresh_rate}ms[/dim]")
     console.print("[dim]Press Ctrl+C to exit[/dim]\n")

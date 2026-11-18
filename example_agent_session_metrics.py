@@ -62,7 +62,7 @@ def print_agent_profile(collector: AgentMetricsCollector, agent_name: str):
 
     profile = state["agents"][agent_name]
 
-    print(f"\nAgent profile:")
+    print("\nAgent profile:")
     print(f"  Agent: {profile['agent_name']}")
     print(f"  Invocations: {profile['total_invocations']}")
     print(f"  Success rate: {profile['success_rate']*100:.1f}%")

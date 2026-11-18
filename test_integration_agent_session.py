@@ -10,11 +10,7 @@ These tests simulate realistic agent workflow scenarios including:
 
 import json
 import tempfile
-import time
-from datetime import datetime
 from pathlib import Path
-
-import pytest
 
 from agent_metrics_collector import AgentMetricsCollector
 

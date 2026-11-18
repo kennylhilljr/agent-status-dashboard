@@ -10,16 +10,14 @@ Tests cover:
 """
 
 import asyncio
-import json
-import pytest
-from pathlib import Path
 from datetime import datetime
-from aiohttp import web
+from pathlib import Path
+
+import pytest
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
 from dashboard_server import DashboardServer
-from metrics_store import MetricsStore
-from metrics import DashboardState, AgentProfile, AgentEvent
+from metrics import AgentEvent, AgentProfile, DashboardState
 
 
 class TestWebSocketServer(AioHTTPTestCase):

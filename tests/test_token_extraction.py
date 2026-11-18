@@ -15,7 +15,7 @@ Test coverage includes:
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -23,7 +23,6 @@ from agent_metrics_collector import AgentMetricsCollector
 
 # Try to import from agents.orchestrator, with fallback
 try:
-    from agents.orchestrator import extract_token_counts, run_orchestrated_session
     from claude_agent_sdk import (
         AssistantMessage,
         TextBlock,
@@ -31,6 +30,8 @@ try:
         ToolUseBlock,
         UserMessage,
     )
+
+    from agents.orchestrator import extract_token_counts, run_orchestrated_session
     SDK_AVAILABLE = True
 except ImportError:
     # SDK not available, we'll mock it
@@ -157,7 +158,7 @@ class TestTokenExtractionDirect:
         mock_usage.output_tokens = 5678
 
         # Create mock message with usage
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -174,7 +175,7 @@ class TestTokenExtractionDirect:
         mock_usage.prompt_tokens = 2000
         mock_usage.completion_tokens = 3000
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -184,7 +185,7 @@ class TestTokenExtractionDirect:
 
     def test_extract_tokens_from_metadata_dict(self):
         """Test extraction from metadata as dict."""
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.metadata = {
             'input_tokens': 1111,
             'output_tokens': 2222
@@ -201,7 +202,7 @@ class TestTokenExtractionDirect:
         mock_metadata.input_tokens = 3000
         mock_metadata.output_tokens = 4000
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.metadata = mock_metadata
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -215,7 +216,7 @@ class TestTokenExtractionDirect:
         mock_usage.input_tokens = 5555
         mock_usage.output_tokens = 6666
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg._usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -226,7 +227,7 @@ class TestTokenExtractionDirect:
     def test_extract_tokens_fallback_to_defaults(self):
         """Test fallback to default values when no metadata available."""
         # Message with no usage info
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
 
         input_tokens, output_tokens = extract_token_counts(msg)
 
@@ -242,7 +243,7 @@ class TestTokenExtractionDirect:
         mock_usage.prompt_tokens = None
         mock_usage.completion_tokens = None
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -257,7 +258,7 @@ class TestTokenExtractionDirect:
         mock_usage.input_tokens = 0
         mock_usage.output_tokens = 100
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -268,7 +269,7 @@ class TestTokenExtractionDirect:
 
     def test_extract_tokens_handles_malformed_data(self):
         """Test graceful handling of malformed metadata."""
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = "not a proper object"  # Invalid type
 
         # Should not crash
@@ -284,7 +285,7 @@ class TestTokenExtractionDirect:
         mock_usage.input_tokens = "100"
         mock_usage.output_tokens = "200"
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -302,7 +303,7 @@ class TestTokenExtractionDirect:
         mock_usage.input_tokens = 1000
         mock_usage.output_tokens = 2000
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
         msg.metadata = {'input_tokens': 9999, 'output_tokens': 9999}
 
@@ -331,9 +332,9 @@ class TestTokenExtractionIntegration:
             # Create mock message with token metadata
             async def mock_receive_response():
                 msg = AssistantMessage(
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-52"}
@@ -350,11 +351,8 @@ class TestTokenExtractionIntegration:
 
                 # Tool result
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -397,9 +395,9 @@ class TestTokenExtractionIntegration:
             # Create mock message WITHOUT token metadata
             async def mock_receive_response():
                 yield AssistantMessage(
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-52"}
@@ -408,11 +406,8 @@ class TestTokenExtractionIntegration:
                 )
 
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -454,9 +449,9 @@ class TestTokenExtractionIntegration:
             async def mock_receive_response():
                 # First delegation with high token count
                 msg1 = AssistantMessage(
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-52"}
@@ -470,11 +465,8 @@ class TestTokenExtractionIntegration:
                 yield msg1
 
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -484,9 +476,9 @@ class TestTokenExtractionIntegration:
 
                 # Second delegation with different token count
                 msg2 = AssistantMessage(
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_2",
                             name="Task",
                             input={"agent": "github", "task": "Create PR for AI-52"}
@@ -500,11 +492,8 @@ class TestTokenExtractionIntegration:
                 yield msg2
 
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_2",
                             content="PR created",
                             is_error=False
@@ -549,7 +538,6 @@ class TestTokenCostCalculation:
     async def test_cost_calculation_with_extracted_tokens(self):
         """Test that costs are calculated correctly from extracted tokens."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            project_dir = Path(tmpdir)
             collector = AgentMetricsCollector("test-project", Path(tmpdir))
             session_id = collector.start_session()
 
@@ -618,7 +606,7 @@ class TestTokenExtractionEdgeCases:
         mock_usage.input_tokens = 1000000  # 1M tokens
         mock_usage.output_tokens = 2000000  # 2M tokens
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -634,7 +622,7 @@ class TestTokenExtractionEdgeCases:
         mock_usage.output_tokens = None
         mock_usage.completion_tokens = 6000
 
-        msg = AssistantMessage(content=[])
+        msg = AssistantMessage(content=[], model="claude-sonnet-4-5")
         msg.usage = mock_usage
 
         input_tokens, output_tokens = extract_token_counts(msg)
@@ -657,9 +645,9 @@ class TestTokenExtractionEdgeCases:
             async def mock_receive_response():
                 # Message with corrupted usage metadata
                 msg = AssistantMessage(
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-52"}
@@ -671,11 +659,8 @@ class TestTokenExtractionEdgeCases:
                 yield msg
 
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -687,7 +672,7 @@ class TestTokenExtractionEdgeCases:
 
             # Should not crash despite corrupted metadata
             with mock_client:
-                result = await run_orchestrated_session(
+                await run_orchestrated_session(
                     client=mock_client,
                     project_dir=project_dir,
                     session_id=session_id,

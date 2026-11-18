@@ -8,24 +8,36 @@ Tests cover:
 - Live data refresh without page reload
 """
 
-import asyncio
-import json
-import pytest
-import subprocess
+import os
 import time
-from pathlib import Path
 from datetime import datetime
-from playwright.sync_api import Page, expect
+from pathlib import Path
 
+import pytest
+from dashboard_server_process import dashboard_server
+from playwright.sync_api import Page, expect, sync_playwright
+
+from metrics import AgentProfile, DashboardState
 from metrics_store import MetricsStore
-from metrics import DashboardState, AgentProfile, AgentEvent
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DASHBOARD_SOURCE = (REPO_ROOT / 'dashboard.html').read_text()
+# dashboard.html hard-codes the server at localhost:8080; the page served to the
+# browser is rewritten to point at the test server's port instead.
+assert 'localhost:8080' in DASHBOARD_SOURCE, "dashboard.html no longer uses localhost:8080"
 
 
 @pytest.fixture(scope="module")
-def server_process():
+def metrics_dir(tmp_path_factory):
+    """Isolated directory holding the metrics file the server reads."""
+    return tmp_path_factory.mktemp("websocket_playwright")
+
+
+@pytest.fixture(scope="module")
+def server_process(metrics_dir):
     """Start dashboard server for testing."""
     # Create test metrics
-    test_dir = Path.cwd()
+    test_dir = metrics_dir
     store = MetricsStore(project_name='agent-status-dashboard', metrics_dir=test_dir)
 
     # Create test state
@@ -98,35 +110,72 @@ def server_process():
 
     store.save(state)
 
-    # Start server
-    process = subprocess.Popen(
-        ['python', 'dashboard_server.py', '--port', '8080'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        cwd=test_dir
-    )
+    # The dashboard page is served from http://localhost:<port>, so the API must
+    # allow that origin.
+    def server_env(port: int) -> dict[str, str]:
+        return {**os.environ, 'CORS_ALLOWED_ORIGINS': f'http://localhost:{port}'}
 
-    # Wait for server to start
-    time.sleep(3)
+    with dashboard_server(test_dir, env_for_port=server_env) as port:
+        yield port
 
-    yield process
 
-    # Cleanup
-    process.terminate()
-    process.wait(timeout=5)
+@pytest.fixture(scope="module")
+def dashboard_url(server_process):
+    """URL the browser opens; served from the repository by browser_page."""
+    return f'http://localhost:{server_process}/dashboard.html'
+
+
+@pytest.fixture(scope="module")
+def browser():
+    """Chromium for this module, started and stopped with the module.
+
+    The sync Playwright API keeps an event loop running while it is active, so it
+    is shut down at the end of this module rather than kept for the whole session;
+    otherwise later asyncio-based tests could not start their own loops.
+
+    The dashboard page is fulfilled by Playwright rather than by a loopback server,
+    so Chromium's Local Network Access checks would otherwise block the page's
+    WebSocket to ws://localhost.
+    """
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=["--disable-features=LocalNetworkAccessChecks"],
+        )
+        try:
+            yield browser
+        finally:
+            browser.close()
 
 
 @pytest.fixture
-def browser_page(page: Page):
+def page(browser):
+    """Fresh browser context and page for each test."""
+    context = browser.new_context()
+    try:
+        yield context.new_page()
+    finally:
+        context.close()
+
+
+@pytest.fixture
+def browser_page(page: Page, server_process, dashboard_url):
     """Configure browser page for testing."""
     page.set_viewport_size({"width": 1920, "height": 1080})
+    # dashboard_server.py only serves the API and WebSocket, so serve the dashboard
+    # page itself from the repository; API and WebSocket calls reach the test server.
+    html = DASHBOARD_SOURCE.replace('localhost:8080', f'localhost:{server_process}')
+    page.route(
+        dashboard_url,
+        lambda route: route.fulfill(body=html, content_type='text/html'),
+    )
     return page
 
 
-def test_websocket_connection_established(browser_page: Page, server_process):
+def test_websocket_connection_established(browser_page: Page, dashboard_url):
     """Test WebSocket connection establishes successfully."""
     # Navigate to dashboard
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
 
     # Wait for page to load
     browser_page.wait_for_load_state('networkidle')
@@ -143,9 +192,9 @@ def test_websocket_connection_established(browser_page: Page, server_process):
     expect(status_text).to_contain_text('Live updates active', timeout=10000)
 
 
-def test_websocket_receives_initial_data(browser_page: Page, server_process):
+def test_websocket_receives_initial_data(browser_page: Page, dashboard_url):
     """Test WebSocket receives and displays initial metrics data."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for data to load
@@ -156,16 +205,16 @@ def test_websocket_receives_initial_data(browser_page: Page, server_process):
     expect(agent_cards).to_have_count(1, timeout=10000)
 
     # Check agent name is displayed
-    expect(browser_page.locator('text=playwright_test_agent')).to_be_visible()
+    expect(browser_page.locator('text=playwright_test_agent').first).to_be_visible()
 
     # Check stats are displayed
     expect(browser_page.locator('text=Total Sessions')).to_be_visible()
     expect(browser_page.locator('.stat-value').first).to_be_visible()
 
 
-def test_websocket_live_updates(browser_page: Page, server_process):
+def test_websocket_live_updates(browser_page: Page, dashboard_url, metrics_dir):
     """Test WebSocket receives live updates."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for initial connection
@@ -177,7 +226,7 @@ def test_websocket_live_updates(browser_page: Page, server_process):
     assert len(initial_metrics) > 0
 
     # Modify metrics in the background
-    test_dir = Path.cwd()
+    test_dir = metrics_dir
     store = MetricsStore(project_name='agent-status-dashboard', metrics_dir=test_dir)
     state = store.load()
     state['agents']['playwright_test_agent']['xp'] = 1000  # Increase XP
@@ -192,9 +241,9 @@ def test_websocket_live_updates(browser_page: Page, server_process):
     expect(level_badge).to_be_visible(timeout=5000)
 
 
-def test_websocket_connection_status_indicator(browser_page: Page, server_process):
+def test_websocket_connection_status_indicator(browser_page: Page, dashboard_url):
     """Test connection status indicator updates correctly."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
 
     # Initially should show connecting
     status = browser_page.locator('#connection-status')
@@ -207,9 +256,9 @@ def test_websocket_connection_status_indicator(browser_page: Page, server_proces
     expect(indicator).to_be_visible()
 
 
-def test_websocket_updates_timestamp(browser_page: Page, server_process):
+def test_websocket_updates_timestamp(browser_page: Page, dashboard_url):
     """Test that update timestamp is displayed and updates."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for initial update
@@ -221,15 +270,15 @@ def test_websocket_updates_timestamp(browser_page: Page, server_process):
     expect(last_update).to_contain_text('Updated at', timeout=10000)
 
 
-def test_websocket_multiple_updates(browser_page: Page, server_process):
+def test_websocket_multiple_updates(browser_page: Page, dashboard_url, metrics_dir):
     """Test WebSocket handles multiple sequential updates."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for connection
     expect(browser_page.locator('#connection-status.connected')).to_be_visible(timeout=10000)
 
-    test_dir = Path.cwd()
+    test_dir = metrics_dir
     store = MetricsStore(project_name='agent-status-dashboard', metrics_dir=test_dir)
 
     # Make multiple updates
@@ -248,9 +297,9 @@ def test_websocket_multiple_updates(browser_page: Page, server_process):
     assert len(stats) > 0
 
 
-def test_websocket_dashboard_charts_update(browser_page: Page, server_process):
+def test_websocket_dashboard_charts_update(browser_page: Page, dashboard_url):
     """Test that charts update with WebSocket data."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for charts to render
@@ -265,9 +314,9 @@ def test_websocket_dashboard_charts_update(browser_page: Page, server_process):
     assert chart_count >= 5  # We have 5 charts in dashboard
 
 
-def test_websocket_activity_feed_updates(browser_page: Page, server_process):
+def test_websocket_activity_feed_updates(browser_page: Page, dashboard_url):
     """Test that activity feed shows data from WebSocket."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for data
@@ -278,9 +327,9 @@ def test_websocket_activity_feed_updates(browser_page: Page, server_process):
     expect(activity_items.first).to_be_visible(timeout=10000)
 
 
-def test_websocket_page_ready_without_manual_refresh(browser_page: Page, server_process):
+def test_websocket_page_ready_without_manual_refresh(browser_page: Page, dashboard_url):
     """Test that dashboard works without manual refresh - all via WebSocket."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
 
     # Wait for WebSocket connection
     expect(browser_page.locator('#connection-status.connected')).to_be_visible(timeout=10000)
@@ -299,9 +348,9 @@ def test_websocket_page_ready_without_manual_refresh(browser_page: Page, server_
     assert navigation_count == 0  # Normal navigation, not refresh
 
 
-def test_websocket_screenshot_evidence(browser_page: Page, server_process):
+def test_websocket_screenshot_evidence(browser_page: Page, dashboard_url, tmp_path):
     """Take screenshot evidence of WebSocket live updates working."""
-    browser_page.goto('http://localhost:8080/dashboard.html')
+    browser_page.goto(dashboard_url)
     browser_page.wait_for_load_state('networkidle')
 
     # Wait for connection and data
@@ -309,7 +358,7 @@ def test_websocket_screenshot_evidence(browser_page: Page, server_process):
     time.sleep(3)
 
     # Take screenshot showing connected status and data
-    screenshot_path = Path.cwd() / 'evidence_websocket_live_updates.png'
+    screenshot_path = tmp_path / 'evidence_websocket_live_updates.png'
     browser_page.screenshot(path=str(screenshot_path), full_page=True)
 
     assert screenshot_path.exists()
@@ -317,4 +366,4 @@ def test_websocket_screenshot_evidence(browser_page: Page, server_process):
 
 
 if __name__ == '__main__':
-    pytest.main([__file__, '-v', '--headed', '--slowmo=500'])
+    pytest.main([__file__, '-v'])

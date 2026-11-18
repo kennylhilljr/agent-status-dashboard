@@ -9,17 +9,14 @@ and the AgentMetricsCollector, verifying that:
 - Error cases are handled gracefully
 """
 
-import json
 import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from agent_metrics_collector import AgentMetricsCollector
-from metrics import SessionSummary
 
 
 class TestSessionLifecycleBasics:

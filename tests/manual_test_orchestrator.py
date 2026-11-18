@@ -13,17 +13,14 @@ Run this script to verify:
 """
 
 import asyncio
-import json
 import sys
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from agent_metrics_collector import AgentMetricsCollector
 from claude_agent_sdk import (
     AssistantMessage,
     TextBlock,
@@ -35,6 +32,7 @@ from claude_agent_sdk import (
 # Import orchestrator function directly to avoid complex imports
 # We'll patch the imports it needs
 import agents.orchestrator as orchestrator_module
+from agent_metrics_collector import AgentMetricsCollector
 
 
 async def test_single_delegation():
@@ -111,7 +109,7 @@ async def test_single_delegation():
 
         # End session
         collector.end_session(session_id, status="complete")
-        print(f"✓ Ended session")
+        print("✓ Ended session")
 
         # Verify delegation was tracked
         state = collector.get_state()
@@ -126,7 +124,7 @@ async def test_single_delegation():
         print("✓ Correct number of events")
 
         event = state['events'][0]
-        print(f"\nEvent details:")
+        print("\nEvent details:")
         print(f"  - Agent: {event['agent_name']}")
         print(f"  - Ticket: {event['ticket_key']}")
         print(f"  - Status: {event['status']}")
@@ -147,7 +145,7 @@ async def test_single_delegation():
         assert "coding" in state['agents'], "Expected 'coding' agent profile"
 
         coding_profile = state['agents']['coding']
-        print(f"\nCoding agent profile:")
+        print("\nCoding agent profile:")
         print(f"  - Total invocations: {coding_profile['total_invocations']}")
         print(f"  - Successful: {coding_profile['successful_invocations']}")
         print(f"  - Failed: {coding_profile['failed_invocations']}")
@@ -264,7 +262,7 @@ async def test_multiple_delegations():
 
         print("\n✓ Running orchestrated session with 3 delegations...")
         with mock_client:
-            result = await orchestrator_module.run_orchestrated_session(
+            await orchestrator_module.run_orchestrated_session(
                 client=mock_client,
                 project_dir=project_dir,
                 session_id=session_id,
@@ -291,7 +289,7 @@ async def test_multiple_delegations():
 
         # Check session summary
         session = state['sessions'][0]
-        print(f"\nSession summary:")
+        print("\nSession summary:")
         print(f"  - Agents invoked: {session['agents_invoked']}")
         print(f"  - Tickets worked: {session['tickets_worked']}")
         print(f"  - Total tokens: {session['total_tokens']}")
@@ -353,7 +351,7 @@ async def test_error_delegation():
 
         print("\n✓ Running orchestrated session with failing delegation...")
         with mock_client:
-            result = await orchestrator_module.run_orchestrated_session(
+            await orchestrator_module.run_orchestrated_session(
                 client=mock_client,
                 project_dir=project_dir,
                 session_id=session_id,
@@ -380,7 +378,7 @@ async def test_error_delegation():
 
         # Check agent profile
         coding_profile = state['agents']['coding']
-        print(f"\nCoding agent after error:")
+        print("\nCoding agent after error:")
         print(f"  - Total invocations: {coding_profile['total_invocations']}")
         print(f"  - Successful: {coding_profile['successful_invocations']}")
         print(f"  - Failed: {coding_profile['failed_invocations']}")

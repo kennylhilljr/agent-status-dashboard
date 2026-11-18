@@ -7,9 +7,7 @@ Runs orchestrated sessions where the main agent delegates to specialized agents.
 
 import re
 import traceback
-from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -25,7 +23,7 @@ from artifact_detector import get_artifact_detector
 from progress import LINEAR_PROJECT_MARKER
 
 
-def extract_token_counts(msg: AssistantMessage) -> Tuple[int, int]:
+def extract_token_counts(msg: AssistantMessage) -> tuple[int, int]:
     """
     Extract token counts from Claude SDK AssistantMessage.
 
@@ -104,7 +102,7 @@ def extract_token_counts(msg: AssistantMessage) -> Tuple[int, int]:
             if input_tokens is not None and output_tokens is not None:
                 return (int(input_tokens), int(output_tokens))
 
-    except (AttributeError, TypeError, ValueError) as e:
+    except (AttributeError, TypeError, ValueError):
         # Log extraction attempt failure but don't crash
         pass
 
@@ -116,8 +114,8 @@ def extract_token_counts(msg: AssistantMessage) -> Tuple[int, int]:
 async def run_orchestrated_session(
     client: ClaudeSDKClient,
     project_dir: Path,
-    session_id: Optional[str] = None,
-    metrics_collector: Optional[object] = None,
+    session_id: str | None = None,
+    metrics_collector: object | None = None,
 ) -> SessionResult:
     """
     Run an orchestrated session with an initial task prompt.

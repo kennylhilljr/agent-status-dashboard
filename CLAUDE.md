@@ -55,8 +55,9 @@ This is a **multi-agent autonomous software engineering harness** built on the C
 ├── specs/                      # Application specifications
 │   ├── app_spec.txt            # Default application specification
 │   └── *.txt                   # Additional spec templates
-├── pyproject.toml              # Ruff linter/formatter config
-├── requirements.txt            # Pinned Python dependencies
+├── pyproject.toml              # Ruff linter/formatter and pytest config
+├── requirements.in             # Hand-edited dependency list
+├── requirements.txt            # Generated, hashed lock (pip-compile --generate-hashes)
 ├── .env.example                # Environment variable template
 └── .gitignore                  # Git ignore rules
 ```
@@ -94,7 +95,7 @@ Key architectural decisions:
 ## Running the Project
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.11+
 - `uv` (recommended) or `pip` for package management
 - Claude CLI authentication (`claude login`)
 - Arcade API key and gateway (see `.env.example`)
@@ -122,18 +123,30 @@ uv run python scripts/autonomous_agent_demo.py --project-dir my-app --model opus
 
 ### Running Tests
 
+The full suite runs with pytest and needs no provider credentials. These are the
+same commands CI runs (see README "Testing and CI"):
+
+```bash
+python3 -m pip install --require-hashes -r requirements.txt
+python3 -m playwright install chromium
+ruff check .
+python3 -m pytest
+```
+
+The security hook tests can also run standalone:
+
 ```bash
 uv run python scripts/test_security.py
 ```
 
-Tests are in `scripts/test_security.py` and cover:
+`scripts/test_security.py` covers:
 - Command extraction logic (`extract_commands`)
 - chmod validation (only `+x` variants allowed)
 - init.sh validation (only `./init.sh` allowed)
 - Dangerous command blocking (system directories, disallowed commands)
 - Safe command allowlisting
 
-There is no test framework — tests use a custom `test_hook()` harness that runs assertions and prints PASS/FAIL.
+Its `check_*()` helpers print PASS/FAIL for standalone runs; the `test_*()` functions wrap them for pytest.
 
 ## Environment Variables
 
@@ -183,7 +196,7 @@ Only commands in `ALLOWED_COMMANDS` (in `security.py:29-73`) are permitted. Key 
 - **Constants** — module-level typed constants with `Final` where appropriate
 - **Error handling** — specific exception types caught with actionable error messages
 - **Ruff** — linter and formatter configured via `pyproject.toml` (line-length=100, target py311)
-- **No CI/CD** — no `.github/workflows` directory
+- **CI** — `.github/workflows/ci.yml` runs `ruff check .` and `python3 -m pytest` on Python 3.11 for pull requests and pushes to `main`
 
 ## Key Patterns
 

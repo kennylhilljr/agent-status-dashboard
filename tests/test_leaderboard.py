@@ -12,24 +12,24 @@ Tests all components of the leaderboard including:
 """
 
 import json
+
+# Add parent directory to path to import leaderboard module
+import sys
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 from rich.console import Console
 
-# Add parent directory to path to import leaderboard module
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from leaderboard import (
+    DEFAULT_METRICS_DIR,
     LeaderboardRenderer,
     MetricsFileMonitor,
     find_metrics_file,
-    DEFAULT_METRICS_DIR,
 )
 
 
@@ -49,7 +49,7 @@ class TestLeaderboardRenderer:
     @pytest.fixture
     def sample_state(self):
         """Create a sample DashboardState for testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = (now - timedelta(seconds=30)).isoformat()
         old = (now - timedelta(hours=2)).isoformat()
 
@@ -211,7 +211,7 @@ class TestLeaderboardRenderer:
 
     def test_determine_status_active(self, renderer):
         """Test status determination for recently active agent."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = (now - timedelta(seconds=30)).isoformat()
 
         status = renderer._determine_status(recent)
@@ -219,7 +219,7 @@ class TestLeaderboardRenderer:
 
     def test_determine_status_idle(self, renderer):
         """Test status determination for inactive agent."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         old = (now - timedelta(hours=2)).isoformat()
 
         status = renderer._determine_status(old)
@@ -439,7 +439,7 @@ class TestLeaderboardIntegration:
                     "weaknesses": [],
                     "recent_events": ["evt-1"],
                     "last_error": "",
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                 }
             },
             "events": [],
@@ -509,7 +509,7 @@ class TestLeaderboardIntegration:
                     "weaknesses": [],
                     "recent_events": [],
                     "last_error": "",
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                 },
                 "agent_b": {
                     "agent_name": "agent_b",
@@ -532,7 +532,7 @@ class TestLeaderboardIntegration:
                     "weaknesses": [],
                     "recent_events": [],
                     "last_error": "",
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                 },
                 "agent_c": {
                     "agent_name": "agent_c",
@@ -555,7 +555,7 @@ class TestLeaderboardIntegration:
                     "weaknesses": [],
                     "recent_events": [],
                     "last_error": "",
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                 },
             },
             "events": [],
@@ -639,7 +639,7 @@ class TestLeaderboardRanking:
                 "success_rate": 0.95,
                 "avg_duration_seconds": 30.0,
                 "cost_per_success_usd": 0.01,
-                "last_active": datetime.now(timezone.utc).isoformat(),
+                "last_active": datetime.now(UTC).isoformat(),
             },
             "agent2": {
                 "agent_name": "agent2",
@@ -648,7 +648,7 @@ class TestLeaderboardRanking:
                 "success_rate": 0.90,
                 "avg_duration_seconds": 40.0,
                 "cost_per_success_usd": 0.015,
-                "last_active": datetime.now(timezone.utc).isoformat(),
+                "last_active": datetime.now(UTC).isoformat(),
             },
             "agent3": {
                 "agent_name": "agent3",
@@ -657,7 +657,7 @@ class TestLeaderboardRanking:
                 "success_rate": 0.85,
                 "avg_duration_seconds": 50.0,
                 "cost_per_success_usd": 0.02,
-                "last_active": datetime.now(timezone.utc).isoformat(),
+                "last_active": datetime.now(UTC).isoformat(),
             },
         }
 
@@ -676,7 +676,7 @@ class TestLeaderboardRanking:
                 "success_rate": 0.8,
                 "avg_duration_seconds": 45.5,
                 "cost_per_success_usd": 0.0125,
-                "last_active": datetime.now(timezone.utc).isoformat(),
+                "last_active": datetime.now(UTC).isoformat(),
             }
         }
 

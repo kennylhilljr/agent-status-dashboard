@@ -20,7 +20,6 @@ class TestDelegationInstrumentation:
     def test_delegation_tracking_with_simple_task(self):
         """Test that delegation tracking captures agent_name and ticket_key."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            project_dir = Path(tmpdir)
             collector = AgentMetricsCollector("test-project", Path(tmpdir))
             session_id = collector.start_session()
 

@@ -9,14 +9,25 @@ This module tests the dashboard.html in a real browser environment to ensure:
 - Visual elements are present
 """
 
-import asyncio
-import json
-import time
 from pathlib import Path
+
 import pytest
-from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from aiohttp import web
-import threading
+from playwright.async_api import async_playwright
+
+
+async def _new_isolated_page(browser):
+    """New page whose dashboard API calls never reach a real local server.
+
+    dashboard.html talks to http://localhost:8080 (REST) and ws://localhost:8080/ws.
+    These tests load the page from file:// with no server, so both are cut off here
+    rather than hitting whatever might be listening on that port. The WebSocket is
+    left open and silent; REST calls fail as they would with the server down.
+    """
+    page = await browser.new_page()
+    await page.route('http://localhost:8080/**', lambda route: route.abort())
+    await page.route_web_socket('ws://localhost:8080/**', lambda ws: None)
+    return page
 
 
 class TestDashboardBrowser:
@@ -134,7 +145,7 @@ class TestDashboardBrowser:
         """Test that dashboard HTML loads successfully."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -160,7 +171,7 @@ class TestDashboardBrowser:
         """Test that page has correct structure."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -192,7 +203,7 @@ class TestDashboardBrowser:
         """Test that loading state is shown initially."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -216,7 +227,7 @@ class TestDashboardBrowser:
         """Test responsive design at different viewport sizes."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -248,7 +259,7 @@ class TestDashboardBrowser:
         """Test that chart canvas elements are present."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -277,7 +288,7 @@ class TestDashboardBrowser:
         """Test that Chart.js library loads successfully."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -300,7 +311,7 @@ class TestDashboardBrowser:
         """Test that JavaScript executes without console errors."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             errors = []
 
@@ -333,7 +344,7 @@ class TestDashboardBrowser:
         """Test that CSS styling is properly applied."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -362,7 +373,7 @@ class TestDashboardBrowser:
         """Test that dark theme is applied."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -386,7 +397,7 @@ class TestDashboardBrowser:
         """Test that activity feed section exists."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -406,7 +417,7 @@ class TestDashboardBrowser:
         """Test that auto-refresh is configured in JavaScript."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -430,11 +441,11 @@ class TestDashboardBrowser:
                 await browser.close()
 
     @pytest.mark.asyncio
-    async def test_screenshot_capture(self):
+    async def test_screenshot_capture(self, tmp_path):
         """Test capturing screenshot of dashboard."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
             await page.set_viewport_size({"width": 1920, "height": 1080})
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
@@ -445,8 +456,8 @@ class TestDashboardBrowser:
                 await page.wait_for_timeout(2000)
 
                 # Take screenshot
-                screenshot_path = Path(__file__).parent.parent / 'evidence' / 'dashboard_screenshot_test.png'
-                screenshot_path.parent.mkdir(exist_ok=True)
+                # Write to a temp dir so test runs don't modify tracked evidence/ files
+                screenshot_path = tmp_path / 'dashboard_screenshot_test.png'
                 await page.screenshot(path=str(screenshot_path), full_page=True)
 
                 assert screenshot_path.exists()
@@ -464,7 +475,7 @@ class TestDashboardInteractivity:
         """Test that page initializes correctly."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -488,7 +499,7 @@ class TestDashboardInteractivity:
         """Test that utility functions are accessible."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -525,7 +536,7 @@ class TestDashboardVisual:
         """Test that key visual elements are present and visible."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
             await page.set_viewport_size({"width": 1920, "height": 1080})
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
@@ -551,11 +562,11 @@ class TestDashboardVisual:
                 await browser.close()
 
     @pytest.mark.asyncio
-    async def test_full_page_screenshot(self):
+    async def test_full_page_screenshot(self, tmp_path):
         """Capture full page screenshot for visual verification."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            page = await _new_isolated_page(browser)
             await page.set_viewport_size({"width": 1920, "height": 1080})
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
@@ -565,12 +576,8 @@ class TestDashboardVisual:
                 await page.goto(dashboard_url, wait_until='networkidle', timeout=10000)
                 await page.wait_for_timeout(3000)  # Wait for any animations
 
-                # Create evidence directory
-                evidence_dir = Path(__file__).parent.parent / 'evidence'
-                evidence_dir.mkdir(exist_ok=True)
-
-                # Take full page screenshot
-                screenshot_path = evidence_dir / 'dashboard_full_page.png'
+                # Take full page screenshot (temp dir, not the tracked evidence/ files)
+                screenshot_path = tmp_path / 'dashboard_full_page.png'
                 await page.screenshot(path=str(screenshot_path), full_page=True)
 
                 assert screenshot_path.exists()

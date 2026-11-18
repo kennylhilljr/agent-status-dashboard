@@ -20,7 +20,6 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from metrics import DashboardState
 
@@ -58,7 +57,7 @@ def _file_lock(lock_path: Path, timeout: float = 10.0):
                 # Try to acquire exclusive non-blocking lock
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break  # Lock acquired
-            except (IOError, OSError) as e:
+            except OSError as e:
                 # Lock is held by another process
                 if time.time() - start_time >= timeout:
                     raise LockAcquisitionError(
@@ -73,11 +72,11 @@ def _file_lock(lock_path: Path, timeout: float = 10.0):
         if lock_fd is not None:
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            except (IOError, OSError):
+            except OSError:
                 pass  # Ignore errors during unlock
             try:
                 os.close(lock_fd)
-            except (IOError, OSError):
+            except OSError:
                 pass  # Ignore errors during close
 
 
@@ -110,7 +109,7 @@ class MetricsStore:
     # Lock timeout (seconds)
     LOCK_TIMEOUT = 10.0
 
-    def __init__(self, project_name: str, metrics_dir: Optional[Path] = None):
+    def __init__(self, project_name: str, metrics_dir: Path | None = None):
         """Initialize MetricsStore.
 
         Args:
@@ -216,7 +215,7 @@ class MetricsStore:
                     # Try to load main file
                     if self.metrics_path.exists():
                         try:
-                            with open(self.metrics_path, 'r', encoding='utf-8') as f:
+                            with open(self.metrics_path, encoding='utf-8') as f:
                                 data = json.load(f)
 
                             # Validate structure
@@ -226,11 +225,11 @@ class MetricsStore:
                                 # Structure invalid, try backup
                                 raise ValueError("Invalid state structure")
 
-                        except (json.JSONDecodeError, ValueError) as e:
+                        except (json.JSONDecodeError, ValueError):
                             # Main file is corrupted, try backup
                             if self.backup_path.exists():
                                 try:
-                                    with open(self.backup_path, 'r', encoding='utf-8') as f:
+                                    with open(self.backup_path, encoding='utf-8') as f:
                                         data = json.load(f)
 
                                     if self._validate_state(data):
@@ -294,7 +293,7 @@ class MetricsStore:
             return
 
         # Read source file
-        with open(source_path, 'r', encoding='utf-8') as src:
+        with open(source_path, encoding='utf-8') as src:
             backup_data = json.load(src)
 
         # Write to temp file then rename atomically

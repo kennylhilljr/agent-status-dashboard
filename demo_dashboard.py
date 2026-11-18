@@ -8,13 +8,13 @@ representation of what the dashboard displays.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 
 def create_demo_metrics_file():
     """Create a demo metrics file with realistic data."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     recent = (now - timedelta(seconds=45)).isoformat()
     old = (now - timedelta(hours=1)).isoformat()
 
@@ -289,7 +289,6 @@ def render_text_dashboard(data):
     print("├─────────────────┼──────────────┼────────────────────────────────┼───────────────┤")
 
     agents = data.get("agents", {})
-    events = data.get("events", {})
 
     for agent_name, agent_data in sorted(agents.items()):
         success_rate = agent_data.get("success_rate", 0.0)
@@ -299,7 +298,7 @@ def render_text_dashboard(data):
         if last_active:
             try:
                 last_active_dt = datetime.fromisoformat(last_active.replace("Z", "+00:00"))
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 seconds_since = (now - last_active_dt).total_seconds()
 
                 if seconds_since < 60:
@@ -340,7 +339,7 @@ def render_text_dashboard(data):
 
     # Active tasks count
     active_count = 0
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for agent_data in agents.values():
         last_active = agent_data.get("last_active", "")
         if last_active:

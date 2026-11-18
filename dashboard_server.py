@@ -64,11 +64,9 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Set
 
-from aiohttp import web, WSMsgType
+from aiohttp import WSMsgType, web
 from aiohttp.web import Request, Response, WebSocketResponse, middleware
-from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from metrics_store import MetricsStore
 
@@ -140,7 +138,7 @@ async def error_middleware(request: Request, handler):
     try:
         response = await handler(request)
         return response
-    except web.HTTPException as ex:
+    except web.HTTPException:
         # Let HTTP exceptions pass through
         raise
     except Exception as ex:
@@ -165,7 +163,7 @@ class DashboardServer:
     def __init__(
         self,
         project_name: str = "agent-status-dashboard",
-        metrics_dir: Optional[Path] = None,
+        metrics_dir: Path | None = None,
         port: int = 8080,
         host: str = "127.0.0.1"
     ):
@@ -203,8 +201,8 @@ class DashboardServer:
         )
 
         # WebSocket connections tracking
-        self.websockets: Set[WebSocketResponse] = set()
-        self.broadcast_task: Optional[asyncio.Task] = None
+        self.websockets: set[WebSocketResponse] = set()
+        self.broadcast_task: asyncio.Task | None = None
         self.broadcast_interval = 5  # seconds
 
         # Create app with middlewares
@@ -494,7 +492,7 @@ class DashboardServer:
         Runs the aiohttp application and blocks until server is stopped.
         """
         logger.info(f"Starting Dashboard Server on {self.host}:{self.port}")
-        logger.info(f"Endpoints available:")
+        logger.info("Endpoints available:")
         logger.info(f"  GET  {self.host}:{self.port}/health")
         logger.info(f"  GET  {self.host}:{self.port}/api/metrics")
         logger.info(f"  GET  {self.host}:{self.port}/api/agents/<name>")
@@ -502,7 +500,7 @@ class DashboardServer:
         logger.info("")
         logger.info("WebSocket Real-Time Updates:")
         logger.info(f"  Broadcast interval: {self.broadcast_interval}s")
-        logger.info(f"  Auto-reconnect supported with exponential backoff")
+        logger.info("  Auto-reconnect supported with exponential backoff")
         logger.info("")
         logger.info("A2UI Component Integration:")
         logger.info("  Components: TaskCard, ProgressRing, ActivityItem, ErrorCard")

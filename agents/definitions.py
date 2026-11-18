@@ -4,14 +4,10 @@ ChatGPT, Gemini, Groq, KIMI, and Windsurf for multi-AI orchestration.
 """
 
 import os
-import sys
 from pathlib import Path
-from typing import Final, Literal, NamedTuple
+from typing import Final, Literal, NamedTuple, TypeGuard
 
-if sys.version_info >= (3, 10):
-    from typing import TypeGuard
-else:
-    from typing_extensions import TypeGuard
+from claude_agent_sdk.types import AgentDefinition
 
 from arcade_config import (
     get_coding_tools,
@@ -19,7 +15,6 @@ from arcade_config import (
     get_linear_tools,
     get_slack_tools,
 )
-from claude_agent_sdk.types import AgentDefinition
 
 FILE_TOOLS: list[str] = ["Read", "Write", "Edit", "Glob"]
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"

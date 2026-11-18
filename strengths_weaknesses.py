@@ -20,12 +20,11 @@ Weaknesses (areas for improvement):
 All functions are pure with no side effects, making them deterministic and testable.
 """
 
-from typing import List, Tuple
-from metrics import AgentEvent, AgentProfile, DashboardState
+from metrics import AgentEvent, DashboardState
 
 
 def calculate_rolling_window_stats(
-    events: List[AgentEvent],
+    events: list[AgentEvent],
     agent_name: str,
     window_size: int = 20
 ) -> dict:
@@ -206,7 +205,7 @@ def detect_strengths(
     stats: dict,
     percentiles: dict,
     min_events: int = 5
-) -> List[str]:
+) -> list[str]:
     """Detect strengths for an agent based on rolling window statistics.
 
     Strengths are detected when an agent exceeds certain thresholds:
@@ -271,7 +270,7 @@ def detect_weaknesses(
     stats: dict,
     percentiles: dict,
     min_events: int = 5
-) -> List[str]:
+) -> list[str]:
     """Detect weaknesses for an agent based on rolling window statistics.
 
     Weaknesses are detected when an agent falls below certain thresholds:

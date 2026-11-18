@@ -13,28 +13,26 @@ Tests all components of the agent detail view including:
 """
 
 import json
+
+# Add parent directory to path to import agent_detail module
+import sys
 import tempfile
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import patch
 
 import pytest
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-# Add parent directory to path to import agent_detail module
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from agent_detail import (
     AgentDetailRenderer,
     MetricsFileMonitor,
-    find_metrics_file,
     display_agent_detail,
-    LEVEL_TITLES,
-    DEFAULT_METRICS_DIR,
+    find_metrics_file,
 )
 
 
@@ -74,13 +72,13 @@ class TestAgentDetailRenderer:
             "strengths": ["fast_execution", "high_success_rate", "consistent"],
             "weaknesses": [],
             "recent_events": ["evt-1", "evt-2", "evt-3"],
-            "last_active": datetime.now(timezone.utc).isoformat(),
+            "last_active": datetime.now(UTC).isoformat(),
         }
 
     @pytest.fixture
     def sample_events(self):
         """Create sample events for testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = (now - timedelta(seconds=30)).isoformat()
         older = (now - timedelta(minutes=5)).isoformat()
 
@@ -212,7 +210,7 @@ class TestAgentDetailRenderer:
                 "agent_name": "github",
                 "session_id": "sess-1",
                 "ticket_key": "AI-54",
-                "started_at": datetime.now(timezone.utc).isoformat(),
+                "started_at": datetime.now(UTC).isoformat(),
                 "status": "success",
                 "total_tokens": 5000,
                 "duration_seconds": 35.0,
@@ -224,7 +222,7 @@ class TestAgentDetailRenderer:
     def test_create_recent_events_table_respects_limit(self, renderer, sample_events):
         """Test that recent events table respects the limit parameter."""
         # Create many events
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         many_events = []
         for i in range(20):
             many_events.append({
@@ -362,7 +360,7 @@ class TestAgentDetailIntegration:
     @pytest.fixture
     def sample_metrics_file(self):
         """Create a sample metrics file with complete data."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = (now - timedelta(seconds=30)).isoformat()
 
         metrics = {
@@ -484,7 +482,6 @@ class TestAgentDetailIntegration:
 
     def test_agent_detail_with_empty_strengths_weaknesses(self, capsys):
         """Test agent detail rendering with empty strengths/weaknesses."""
-        now = datetime.now(timezone.utc)
         metrics = {
             "version": 1,
             "project_name": "test",

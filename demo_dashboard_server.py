@@ -10,14 +10,13 @@ This script:
 import asyncio
 import json
 import subprocess
-import time
 import sys
-from pathlib import Path
+import time
 from datetime import datetime
+from pathlib import Path
 
+from metrics import AgentProfile, DashboardState
 from metrics_store import MetricsStore
-from metrics import DashboardState, AgentProfile, AgentEvent
-
 
 # Server configuration
 SERVER_PORT = 8765
@@ -214,7 +213,7 @@ def start_server():
             if result == 0:
                 print(f"✓ Server started successfully on {BASE_URL}")
                 return process
-        except:
+        except BaseException:  # was a bare except; kept equally broad
             pass
         time.sleep(1)
         if i % 3 == 0:
@@ -250,7 +249,7 @@ async def test_with_playwright(screenshot_dir: Path):
             content = await page.evaluate('() => document.body.innerText')
             data = json.loads(content)
 
-            print(f"   ✓ Health check passed")
+            print("   ✓ Health check passed")
             print(f"   - Status: {data['status']}")
             print(f"   - Project: {data['project']}")
             print(f"   - Agents: {data['agent_count']}")
@@ -258,7 +257,7 @@ async def test_with_playwright(screenshot_dir: Path):
 
             # Take screenshot
             await page.screenshot(path=str(screenshot_dir / 'health_endpoint.png'))
-            print(f"   ✓ Screenshot saved: health_endpoint.png")
+            print("   ✓ Screenshot saved: health_endpoint.png")
 
         except Exception as e:
             print(f"   ✗ FAILED: {e}")
@@ -273,7 +272,7 @@ async def test_with_playwright(screenshot_dir: Path):
             content = await page.evaluate('() => document.body.innerText')
             data = json.loads(content)
 
-            print(f"   ✓ Metrics endpoint passed")
+            print("   ✓ Metrics endpoint passed")
             print(f"   - Total sessions: {data['total_sessions']}")
             print(f"   - Total tokens: {data['total_tokens']:,}")
             print(f"   - Total cost: ${data['total_cost_usd']:.2f}")
@@ -281,7 +280,7 @@ async def test_with_playwright(screenshot_dir: Path):
 
             # Take screenshot
             await page.screenshot(path=str(screenshot_dir / 'metrics_endpoint.png'))
-            print(f"   ✓ Screenshot saved: metrics_endpoint.png")
+            print("   ✓ Screenshot saved: metrics_endpoint.png")
 
         except Exception as e:
             print(f"   ✗ FAILED: {e}")
@@ -297,7 +296,7 @@ async def test_with_playwright(screenshot_dir: Path):
             data = json.loads(content)
 
             agent = data['agent']
-            print(f"   ✓ Agent endpoint passed")
+            print("   ✓ Agent endpoint passed")
             print(f"   - Agent: {agent['agent_name']}")
             print(f"   - Invocations: {agent['total_invocations']}")
             print(f"   - Success rate: {agent['success_rate']*100:.1f}%")
@@ -307,7 +306,7 @@ async def test_with_playwright(screenshot_dir: Path):
 
             # Take screenshot
             await page.screenshot(path=str(screenshot_dir / 'agent_endpoint.png'))
-            print(f"   ✓ Screenshot saved: agent_endpoint.png")
+            print("   ✓ Screenshot saved: agent_endpoint.png")
 
         except Exception as e:
             print(f"   ✗ FAILED: {e}")
@@ -322,13 +321,13 @@ async def test_with_playwright(screenshot_dir: Path):
             content = await page.evaluate('() => document.body.innerText')
             data = json.loads(content)
 
-            print(f"   ✓ 404 error handling passed")
+            print("   ✓ 404 error handling passed")
             print(f"   - Error: {data['error']}")
             print(f"   - Available agents: {', '.join(data['available_agents'])}")
 
             # Take screenshot
             await page.screenshot(path=str(screenshot_dir / '404_error.png'))
-            print(f"   ✓ Screenshot saved: 404_error.png")
+            print("   ✓ Screenshot saved: 404_error.png")
 
         except Exception as e:
             print(f"   ✗ FAILED: {e}")

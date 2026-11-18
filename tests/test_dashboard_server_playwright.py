@@ -5,39 +5,28 @@ Uses Playwright to simulate real browser requests and validate responses.
 """
 
 import json
-import pytest
-import asyncio
-import subprocess
-import time
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-from playwright.async_api import async_playwright, Browser, Page
+import pytest
+import pytest_asyncio
+from dashboard_server_process import HOST, dashboard_server
+from playwright.async_api import Browser, Page, async_playwright
+
+from metrics import AgentProfile, DashboardState
 from metrics_store import MetricsStore
-from metrics import DashboardState, AgentProfile, AgentEvent
 
-
-# Server configuration for tests
-TEST_PORT = 8889
-TEST_HOST = 'localhost'
-BASE_URL = f'http://{TEST_HOST}:{TEST_PORT}'
+# All tests and async fixtures in this module share one event loop, so the
+# module-scoped Playwright browser can be used from every test.
+pytestmark = pytest.mark.asyncio(loop_scope='module')
 
 
 @pytest.fixture(scope='module')
-def test_metrics_dir():
-    """Create temporary directory for test metrics."""
-    test_dir = Path('/tmp/test_dashboard_playwright')
-    test_dir.mkdir(exist_ok=True)
-
-    # Create test metrics data
+def test_metrics_dir(tmp_path_factory):
+    """Create an isolated temporary directory with test metrics."""
+    test_dir = tmp_path_factory.mktemp('dashboard_server_playwright')
     _create_test_metrics(test_dir)
-
-    yield test_dir
-
-    # Cleanup
-    import shutil
-    if test_dir.exists():
-        shutil.rmtree(test_dir)
+    return test_dir
 
 
 def _create_test_metrics(test_dir: Path):
@@ -163,53 +152,15 @@ def _create_test_metrics(test_dir: Path):
 
 
 @pytest.fixture(scope='module')
-async def server_process(test_metrics_dir):
-    """Start dashboard server as subprocess for testing."""
-    # Start server process
-    cmd = [
-        'python',
-        str(Path(__file__).parent.parent / 'dashboard_server.py'),
-        '--port', str(TEST_PORT),
-        '--host', TEST_HOST,
-        '--metrics-dir', str(test_metrics_dir),
-        '--project-name', 'test-playwright-project'
-    ]
-
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-
-    # Wait for server to start
-    max_wait = 10
-    for _ in range(max_wait):
-        try:
-            # Try to connect
-            import socket
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            result = sock.connect_ex((TEST_HOST, TEST_PORT))
-            sock.close()
-            if result == 0:
-                break
-        except:
-            pass
-        time.sleep(1)
-    else:
-        process.kill()
-        raise RuntimeError(f"Server failed to start within {max_wait} seconds")
-
-    yield process
-
-    # Cleanup
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
+def server_url(test_metrics_dir):
+    """Start dashboard_server.py on a free port and return its base URL."""
+    with dashboard_server(
+        test_metrics_dir, extra_args=('--project-name', 'test-playwright-project')
+    ) as port:
+        yield f'http://{HOST}:{port}'
 
 
-@pytest.fixture(scope='module')
+@pytest_asyncio.fixture(scope='module', loop_scope='module')
 async def browser():
     """Create Playwright browser instance."""
     async with async_playwright() as p:
@@ -218,7 +169,7 @@ async def browser():
         await browser.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope='module')
 async def page(browser: Browser):
     """Create new page for each test."""
     page = await browser.new_page()
@@ -226,11 +177,10 @@ async def page(browser: Browser):
     await page.close()
 
 
-@pytest.mark.asyncio
-async def test_health_endpoint_browser(server_process, page: Page):
+async def test_health_endpoint_browser(server_url, page: Page):
     """Test health check endpoint via browser."""
     # Navigate to health endpoint
-    response = await page.goto(f'{BASE_URL}/health')
+    response = await page.goto(f'{server_url}/health')
 
     # Check response status
     assert response.status == 200
@@ -249,11 +199,10 @@ async def test_health_endpoint_browser(server_process, page: Page):
     assert data['agent_count'] == 2
 
 
-@pytest.mark.asyncio
-async def test_metrics_endpoint_browser(server_process, page: Page):
+async def test_metrics_endpoint_browser(server_url, page: Page):
     """Test /api/metrics endpoint via browser."""
     # Navigate to metrics endpoint
-    response = await page.goto(f'{BASE_URL}/api/metrics')
+    response = await page.goto(f'{server_url}/api/metrics')
 
     # Check response status
     assert response.status == 200
@@ -273,11 +222,10 @@ async def test_metrics_endpoint_browser(server_process, page: Page):
     assert len(data['events']) == 10
 
 
-@pytest.mark.asyncio
-async def test_agent_endpoint_browser(server_process, page: Page):
+async def test_agent_endpoint_browser(server_url, page: Page):
     """Test /api/agents/<name> endpoint via browser."""
     # Navigate to agent endpoint
-    response = await page.goto(f'{BASE_URL}/api/agents/coding_agent')
+    response = await page.goto(f'{server_url}/api/agents/coding_agent')
 
     # Check response status
     assert response.status == 200
@@ -295,11 +243,10 @@ async def test_agent_endpoint_browser(server_process, page: Page):
     assert 'century_club' in data['agent']['achievements']
 
 
-@pytest.mark.asyncio
-async def test_agent_not_found_browser(server_process, page: Page):
+async def test_agent_not_found_browser(server_url, page: Page):
     """Test /api/agents/<name> returns 404 for non-existent agent."""
     # Navigate to non-existent agent
-    response = await page.goto(f'{BASE_URL}/api/agents/nonexistent_agent')
+    response = await page.goto(f'{server_url}/api/agents/nonexistent_agent')
 
     # Check response status
     assert response.status == 404
@@ -317,11 +264,10 @@ async def test_agent_not_found_browser(server_process, page: Page):
     assert 'github_agent' in data['available_agents']
 
 
-@pytest.mark.asyncio
-async def test_metrics_pretty_browser(server_process, page: Page):
+async def test_metrics_pretty_browser(server_url, page: Page):
     """Test /api/metrics with pretty parameter via browser."""
     # Navigate to metrics with pretty parameter
-    response = await page.goto(f'{BASE_URL}/api/metrics?pretty')
+    response = await page.goto(f'{server_url}/api/metrics?pretty')
 
     # Check response status
     assert response.status == 200
@@ -335,11 +281,10 @@ async def test_metrics_pretty_browser(server_process, page: Page):
     assert data['project_name'] == 'test-playwright-project'
 
 
-@pytest.mark.asyncio
-async def test_agent_with_events_browser(server_process, page: Page):
+async def test_agent_with_events_browser(server_url, page: Page):
     """Test /api/agents/<name> with include_events parameter via browser."""
     # Navigate to agent with events
-    response = await page.goto(f'{BASE_URL}/api/agents/coding_agent?include_events')
+    response = await page.goto(f'{server_url}/api/agents/coding_agent?include_events')
 
     # Check response status
     assert response.status == 200
@@ -357,16 +302,22 @@ async def test_agent_with_events_browser(server_process, page: Page):
         assert event['agent_name'] == 'coding_agent'
 
 
-@pytest.mark.asyncio
-async def test_cors_headers_browser(server_process, page: Page):
+async def test_cors_headers_browser(server_url, page: Page):
     """Test CORS headers are present in browser requests."""
     # Navigate to metrics endpoint
-    response = await page.goto(f'{BASE_URL}/api/metrics')
+    response = await page.goto(f'{server_url}/api/metrics')
 
     # Check CORS headers
     headers = response.headers
     assert 'access-control-allow-origin' in headers
-    assert headers['access-control-allow-origin'] == '*'
+    # The server is localhost-only by default (CORS_ALLOWED_ORIGINS unset), see
+    # get_cors_origins() in dashboard_server.py; '*' is opt-in.
+    assert headers['access-control-allow-origin'] in [
+        'http://localhost:3000',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:8080',
+    ]
 
 
 if __name__ == '__main__':

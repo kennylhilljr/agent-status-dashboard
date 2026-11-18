@@ -18,12 +18,9 @@ Usage:
 
 import argparse
 import json
-import os
-import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 from rich.layout import Layout
@@ -86,7 +83,7 @@ class DashboardRenderer:
             if last_active:
                 try:
                     last_active_dt = datetime.fromisoformat(last_active.replace("Z", "+00:00"))
-                    now = datetime.now(timezone.utc)
+                    now = datetime.now(UTC)
                     seconds_since = (now - last_active_dt).total_seconds()
 
                     if seconds_since < 60:
@@ -133,11 +130,10 @@ class DashboardRenderer:
         """
         agents = state.get("agents", {})
         events = state.get("events", [])
-        sessions = state.get("sessions", [])
 
         # Calculate active task count (agents active in last 60 seconds)
         active_count = 0
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for agent_data in agents.values():
             last_active = agent_data.get("last_active", "")
             if last_active:
@@ -207,9 +203,9 @@ class DashboardRenderer:
             updated_str = "Never"
 
         text = Text()
-        text.append(f"Project: ", style="bold")
+        text.append("Project: ", style="bold")
         text.append(f"{project_name}\n", style="cyan bold")
-        text.append(f"Last Updated: ", style="bold")
+        text.append("Last Updated: ", style="bold")
         text.append(f"{updated_str}", style="dim")
 
         return Panel(text, title="Agent Status Dashboard", border_style="green")
@@ -307,7 +303,7 @@ class MetricsFileMonitor:
         self.metrics_path = metrics_path
         self._last_modified_time = 0.0
 
-    def load_metrics(self) -> Optional[dict]:
+    def load_metrics(self) -> dict | None:
         """Load metrics from file if it exists.
 
         Returns:
@@ -317,10 +313,10 @@ class MetricsFileMonitor:
             return None
 
         try:
-            with open(self.metrics_path, 'r', encoding='utf-8') as f:
+            with open(self.metrics_path, encoding='utf-8') as f:
                 data = json.load(f)
             return data
-        except (json.JSONDecodeError, IOError, OSError):
+        except (json.JSONDecodeError, OSError):
             # File is corrupted or unreadable
             return None
 
@@ -338,13 +334,13 @@ class MetricsFileMonitor:
             if current_mtime != self._last_modified_time:
                 self._last_modified_time = current_mtime
                 return True
-        except (IOError, OSError):
+        except OSError:
             pass
 
         return False
 
 
-def find_metrics_file(metrics_dir: Optional[Path] = None) -> Path:
+def find_metrics_file(metrics_dir: Path | None = None) -> Path:
     """Find metrics file path.
 
     Searches in the following order:
@@ -437,7 +433,7 @@ def main():
 
     # Print startup information
     console = Console()
-    console.print(f"[cyan]Starting Agent Status Dashboard...[/cyan]")
+    console.print("[cyan]Starting Agent Status Dashboard...[/cyan]")
     console.print(f"[dim]Monitoring: {metrics_path}[/dim]")
     console.print(f"[dim]Refresh rate: {args.refresh_rate}ms[/dim]")
     console.print("[dim]Press Ctrl+C to exit[/dim]\n")
