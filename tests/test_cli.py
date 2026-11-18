@@ -288,7 +288,7 @@ class TestCLIArgumentParsing:
             try:
                 json.loads(result.stdout)
                 assert True
-            except Exception:
+            except json.JSONDecodeError:
                 # If not valid JSON, should still complete
                 assert result.returncode in [0, 1]
         finally:

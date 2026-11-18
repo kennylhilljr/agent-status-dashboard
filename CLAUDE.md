@@ -95,7 +95,7 @@ Key architectural decisions:
 ## Running the Project
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.11+
 - `uv` (recommended) or `pip` for package management
 - Claude CLI authentication (`claude login`)
 - Arcade API key and gateway (see `.env.example`)

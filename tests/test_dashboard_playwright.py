@@ -432,7 +432,7 @@ class TestDashboardBrowser:
                 await browser.close()
 
     @pytest.mark.asyncio
-    async def test_screenshot_capture(self):
+    async def test_screenshot_capture(self, tmp_path):
         """Test capturing screenshot of dashboard."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -447,8 +447,8 @@ class TestDashboardBrowser:
                 await page.wait_for_timeout(2000)
 
                 # Take screenshot
-                screenshot_path = Path(__file__).parent.parent / 'evidence' / 'dashboard_screenshot_test.png'
-                screenshot_path.parent.mkdir(exist_ok=True)
+                # Write to a temp dir so test runs don't modify tracked evidence/ files
+                screenshot_path = tmp_path / 'dashboard_screenshot_test.png'
                 await page.screenshot(path=str(screenshot_path), full_page=True)
 
                 assert screenshot_path.exists()
@@ -553,7 +553,7 @@ class TestDashboardVisual:
                 await browser.close()
 
     @pytest.mark.asyncio
-    async def test_full_page_screenshot(self):
+    async def test_full_page_screenshot(self, tmp_path):
         """Capture full page screenshot for visual verification."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -567,12 +567,8 @@ class TestDashboardVisual:
                 await page.goto(dashboard_url, wait_until='networkidle', timeout=10000)
                 await page.wait_for_timeout(3000)  # Wait for any animations
 
-                # Create evidence directory
-                evidence_dir = Path(__file__).parent.parent / 'evidence'
-                evidence_dir.mkdir(exist_ok=True)
-
-                # Take full page screenshot
-                screenshot_path = evidence_dir / 'dashboard_full_page.png'
+                # Take full page screenshot (temp dir, not the tracked evidence/ files)
+                screenshot_path = tmp_path / 'dashboard_full_page.png'
                 await page.screenshot(path=str(screenshot_path), full_page=True)
 
                 assert screenshot_path.exists()

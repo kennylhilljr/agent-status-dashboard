@@ -720,8 +720,8 @@ python3 -m pytest
 Browser setup differs by platform. On macOS, `python3 -m playwright install chromium`
 is enough. On Linux, Chromium also needs system libraries; CI installs both with
 `python3 -m playwright install --with-deps chromium` (this uses `sudo apt-get`).
-The WebSocket browser tests start `dashboard_server.py` on port 8080, because
-`dashboard.html` connects to `localhost:8080`, so that port must be free.
+Browser tests start their own `dashboard_server.py` on a free port with a temporary
+metrics directory, so they don't need, or touch, a running dashboard.
 
 ### Updating dependencies
 

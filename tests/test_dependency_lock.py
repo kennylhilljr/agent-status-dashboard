@@ -24,6 +24,35 @@ def _input_requirements() -> list[Requirement]:
     return requirements
 
 
+def _locked_sources() -> dict[str, set[str]]:
+    """Parse pip-compile's "# via" annotations into {package: {sources}}.
+
+    A source is either another normalized package name or "-r requirements.in".
+    """
+    sources: dict[str, set[str]] = {}
+    current = None
+    in_via = False
+    for raw in REQUIREMENTS_TXT.read_text().splitlines():
+        match = re.match(r"([A-Za-z0-9._-]+)==", raw)
+        if match:
+            current = canonicalize_name(match.group(1))
+            sources[current] = set()
+            in_via = False
+            continue
+        comment = raw.strip().removeprefix("#").strip()
+        if current is None or not raw.lstrip().startswith("#"):
+            continue
+        if comment.startswith("via"):
+            in_via = True
+            comment = comment.removeprefix("via").strip()
+        if in_via and comment:
+            if comment.startswith("-r "):
+                sources[current].add("-r requirements.in")
+            else:
+                sources[current].add(canonicalize_name(comment))
+    return sources
+
+
 def _locked_entries() -> dict[str, tuple[str, list[str]]]:
     """Parse requirements.txt into {normalized name: (version, hashes)}."""
     entries: dict[str, tuple[str, list[str]]] = {}
@@ -75,6 +104,24 @@ def test_lock_satisfies_every_input():
         assert name in entries, f"{req.name} is missing from requirements.txt"
         version, _ = entries[name]
         assert req.specifier.contains(version, prereleases=True), (str(req), version)
+
+
+def test_lock_contains_only_what_inputs_require():
+    """Every locked package must be declared or needed by a declared package."""
+    sources = _locked_sources()
+    assert set(sources) == set(_locked_entries())
+    declared = {canonicalize_name(req.name) for req in _input_requirements()}
+    reachable = set(declared)
+    changed = True
+    while changed:
+        changed = False
+        for name, via in sources.items():
+            if name not in reachable and via & reachable:
+                reachable.add(name)
+                changed = True
+    for name in declared:
+        assert "-r requirements.in" in sources.get(name, set()), name
+    assert sorted(set(sources) - reachable) == []
 
 
 def test_installed_distributions_match_lock():

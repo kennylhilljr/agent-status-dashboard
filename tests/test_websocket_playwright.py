@@ -8,6 +8,8 @@ Tests cover:
 - Live data refresh without page reload
 """
 
+import os
+import socket
 import subprocess
 import sys
 import time
@@ -22,10 +24,25 @@ from metrics import AgentProfile, DashboardState
 from metrics_store import MetricsStore
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-# dashboard.html hard-codes http://localhost:8080 and ws://localhost:8080/ws, so the
-# server under test has to listen on that port.
-SERVER_PORT = 8080
-DASHBOARD_URL = f'http://localhost:{SERVER_PORT}/dashboard.html'
+
+
+
+def _free_port() -> int:
+    """Ask the OS for a currently unused TCP port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('127.0.0.1', 0))
+        return sock.getsockname()[1]
+
+
+SERVER_PORT = _free_port()
+ORIGIN = f'http://localhost:{SERVER_PORT}'
+DASHBOARD_URL = f'{ORIGIN}/dashboard.html'
+# dashboard.html hard-codes the server at localhost:8080; the page served to the
+# browser points at the test server's port instead.
+DASHBOARD_HTML = (REPO_ROOT / 'dashboard.html').read_text().replace(
+    'localhost:8080', f'localhost:{SERVER_PORT}'
+)
+assert f'localhost:{SERVER_PORT}' in DASHBOARD_HTML, "dashboard.html no longer uses localhost:8080"
 
 
 @pytest.fixture(scope="module")
@@ -121,7 +138,9 @@ def server_process(metrics_dir):
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        cwd=test_dir
+        cwd=test_dir,
+        # The dashboard page is served from ORIGIN, so the API must allow it.
+        env={**os.environ, 'CORS_ALLOWED_ORIGINS': ORIGIN},
     )
 
     try:
@@ -197,7 +216,7 @@ def browser_page(page: Page):
     # page itself from the repository; API and WebSocket calls reach the real server.
     page.route(
         DASHBOARD_URL,
-        lambda route: route.fulfill(path=str(REPO_ROOT / 'dashboard.html')),
+        lambda route: route.fulfill(body=DASHBOARD_HTML, content_type='text/html'),
     )
     return page
 
