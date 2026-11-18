@@ -25,18 +25,24 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-def _stop(process: subprocess.Popen) -> None:
+def _stop(process: subprocess.Popen) -> str:
+    """Stop the server and return everything it printed."""
     process.terminate()
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait()
+    output = process.stdout.read().decode(errors='replace')
     process.stdout.close()
+    return output
 
 
 def _wait_until_ready(process: subprocess.Popen, port: int) -> bool:
-    """Poll /health until it answers. False if the server exited first."""
+    """Poll /health until it answers. False if the server exited first.
+
+    Raises TimeoutError if it neither answers nor exits in time.
+    """
     deadline = time.monotonic() + _READY_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -48,7 +54,7 @@ def _wait_until_ready(process: subprocess.Popen, port: int) -> bool:
         except OSError:
             pass
         time.sleep(0.2)
-    raise RuntimeError(f"dashboard_server.py did not become ready within {_READY_TIMEOUT_SECONDS}s")
+    raise TimeoutError(f"dashboard_server.py did not become ready within {_READY_TIMEOUT_SECONDS}s")
 
 
 @contextmanager
@@ -82,6 +88,8 @@ def dashboard_server(
         )
         try:
             ready = _wait_until_ready(process, port)
+        except TimeoutError as exc:
+            raise RuntimeError(f"{exc}; server output:\n{_stop(process)}") from exc
         except BaseException:
             _stop(process)
             raise
@@ -91,8 +99,7 @@ def dashboard_server(
             finally:
                 _stop(process)
             return
-        output = process.stdout.read().decode(errors='replace')
-        _stop(process)
+        output = _stop(process)
     raise RuntimeError(
         f"dashboard_server.py exited before becoming ready ({_START_ATTEMPTS} attempts):\n{output}"
     )

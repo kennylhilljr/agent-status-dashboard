@@ -48,6 +48,10 @@ aiohttp-cors>=0.7.0
 playwright>=1.40.0
 
 # Test and lint tooling
+# pip-tools is not locked here: a hashed lock of it would also have to pin pip and
+# setuptools. Install the pinned version above when regenerating instead.
+# pytest-playwright is not used: its session-wide sync event loop breaks the
+# pytest-asyncio tests that run after it; the browser tests use playwright directly.
 pytest>=8.0.0
 pytest-cov>=4.1.0
 packaging

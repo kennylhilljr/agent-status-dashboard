@@ -213,7 +213,7 @@ def start_server():
             if result == 0:
                 print(f"✓ Server started successfully on {BASE_URL}")
                 return process
-        except Exception:
+        except BaseException:  # was a bare except; kept equally broad
             pass
         time.sleep(1)
         if i % 3 == 0:
