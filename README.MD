@@ -624,8 +624,8 @@ cd Agent-Engineers
 # Create virtual environment
 python3 -m venv venv && source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the locked dependencies (exact versions, verified by hash)
+python3 -m pip install --require-hashes -r requirements.txt
 
 # Configure environment
 cp .env.example .env
@@ -697,6 +697,46 @@ uv run python scripts/autonomous_agent_demo.py --project-dir my-app --model sonn
 # Limit iterations for testing
 uv run python scripts/autonomous_agent_demo.py --project-dir my-app --max-iterations 3
 ```
+
+## 🧪 Testing and CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull request and on
+every push to `main`, on Ubuntu with Python 3.11. A Ruff or pytest failure fails the
+workflow. The tests need no provider credentials: CI sets none, and the root
+`conftest.py` stops a local `.env` file or exported provider keys from reaching the
+tests. Credentials are only needed to *run* the agents (see Setup above), not to test them.
+
+Run the same checks locally from a clean checkout:
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+python3 -m pip install --require-hashes -r requirements.txt
+python3 -m pip check
+python3 -m playwright install chromium
+ruff check .
+python3 -m pytest
+```
+
+Browser setup differs by platform. On macOS, `python3 -m playwright install chromium`
+is enough. On Linux, Chromium also needs system libraries; CI installs both with
+`python3 -m playwright install --with-deps chromium` (this uses `sudo apt-get`).
+The WebSocket browser tests start `dashboard_server.py` on port 8080, because
+`dashboard.html` connects to `localhost:8080`, so that port must be free.
+
+### Updating dependencies
+
+`requirements.in` is the only hand-edited dependency list. `requirements.txt` is a
+generated lock with every transitive dependency pinned and hashed. After editing
+`requirements.in`, regenerate the lock on Python 3.11 and commit both files:
+
+```bash
+python3 -m pip install pip-tools==7.7.0
+pip-compile --generate-hashes --strip-extras --output-file=requirements.txt requirements.in
+```
+
+`tests/test_dependency_lock.py` fails if the two files disagree or a pin lacks hashes.
+
+<br/>
 
 ## Command Line Options
 
@@ -809,8 +849,9 @@ Agent-Engineers/
 ├── specs/                       # Application specifications
 │   ├── app_spec.txt             # Default spec
 │   └── *.txt                    # Additional spec templates
-├── pyproject.toml               # Ruff linter/formatter config
-└── requirements.txt             # Python dependencies
+├── pyproject.toml               # Ruff and pytest config
+├── requirements.in              # Hand-edited dependency list
+└── requirements.txt             # Generated, hashed lock (pip-compile)
 ```
 
 <br/>
