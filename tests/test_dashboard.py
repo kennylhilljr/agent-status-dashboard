@@ -10,24 +10,25 @@ Tests all components of the dashboard including:
 """
 
 import json
+
+# Add parent directory to path to import dashboard module
+import sys
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from rich.console import Console
 
-# Add parent directory to path to import dashboard module
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from dashboard import (
+    DEFAULT_METRICS_DIR,
     DashboardRenderer,
     MetricsFileMonitor,
     find_metrics_file,
-    DEFAULT_METRICS_DIR,
 )
 
 
@@ -47,7 +48,7 @@ class TestDashboardRenderer:
     @pytest.fixture
     def sample_state(self):
         """Create a sample DashboardState for testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = (now - timedelta(seconds=30)).isoformat()
         old = (now - timedelta(hours=2)).isoformat()
 
@@ -171,7 +172,7 @@ class TestDashboardRenderer:
 
         # Should have one row showing "No agents"
         assert len(table.rows) == 1
-        assert "No agents" in str(table.rows[0])
+        assert table.columns[0]._cells[0] == "No agents"
 
     def test_create_metrics_panel(self, renderer, sample_state):
         """Test creating metrics panel with system metrics."""
@@ -268,8 +269,9 @@ class TestDashboardRenderer:
 
         # Verify layout structure
         assert layout is not None
-        assert "header" in layout
-        assert "body" in layout
+        # Layout has no __contains__; look the named regions up instead.
+        assert layout.get("header") is not None
+        assert layout.get("body") is not None
 
     def test_format_time_ago_seconds(self, renderer):
         """Test formatting time ago for seconds."""
@@ -459,7 +461,7 @@ class TestDashboardIntegration:
                     "successful_invocations": 5,
                     "failed_invocations": 0,
                     "success_rate": 1.0,
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                 }
             },
             "events": [
@@ -468,8 +470,8 @@ class TestDashboardIntegration:
                     "agent_name": "coding",
                     "session_id": "sess-1",
                     "ticket_key": "AI-200",
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                    "ended_at": datetime.now(timezone.utc).isoformat(),
+                    "started_at": datetime.now(UTC).isoformat(),
+                    "ended_at": datetime.now(UTC).isoformat(),
                     "status": "success",
                     "input_tokens": 1000,
                     "output_tokens": 2000,

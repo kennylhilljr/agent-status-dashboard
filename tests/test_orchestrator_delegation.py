@@ -11,15 +11,10 @@ and the AgentMetricsCollector, verifying that:
 """
 
 import tempfile
-import uuid
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from agent_metrics_collector import AgentMetricsCollector
-from agents.orchestrator import run_orchestrated_session
 from claude_agent_sdk import (
     AssistantMessage,
     TextBlock,
@@ -27,6 +22,9 @@ from claude_agent_sdk import (
     ToolUseBlock,
     UserMessage,
 )
+
+from agent_metrics_collector import AgentMetricsCollector
+from agents.orchestrator import run_orchestrated_session
 
 
 class TestDelegationDetection:
@@ -54,7 +52,6 @@ class TestDelegationDetection:
 
             # Create mock Task tool usage
             task_tool_use = ToolUseBlock(
-                type="tool_use",
                 id="task_123",
                 name="Task",
                 input={"agent": "coding", "task": "Work on AI-51: Implement feature"}
@@ -64,21 +61,17 @@ class TestDelegationDetection:
             async def mock_receive_response():
                 # First yield: Assistant uses Task tool
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
-                        TextBlock(type="text", text="I'll delegate to the coding agent."),
+                        TextBlock(text="I'll delegate to the coding agent."),
                         task_tool_use
                     ]
                 )
 
                 # Second yield: Tool result
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_123",
                             content="Delegation completed successfully",
                             is_error=False
@@ -90,7 +83,7 @@ class TestDelegationDetection:
 
             # Run orchestrated session
             with mock_client:
-                result = await run_orchestrated_session(
+                await run_orchestrated_session(
                     client=mock_client,
                     project_dir=project_dir,
                     session_id=session_id,
@@ -133,11 +126,9 @@ class TestDelegationDetection:
             async def mock_receive_response():
                 # First delegation: coding agent
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-51"}
@@ -145,11 +136,8 @@ class TestDelegationDetection:
                     ]
                 )
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -159,11 +147,9 @@ class TestDelegationDetection:
 
                 # Second delegation: github agent
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_2",
                             name="Task",
                             input={"agent": "github", "task": "Create PR for AI-51"}
@@ -171,11 +157,8 @@ class TestDelegationDetection:
                     ]
                 )
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_2",
                             content="PR created",
                             is_error=False
@@ -186,7 +169,7 @@ class TestDelegationDetection:
             mock_client.receive_response = mock_receive_response
 
             with mock_client:
-                result = await run_orchestrated_session(
+                await run_orchestrated_session(
                     client=mock_client,
                     project_dir=project_dir,
                     session_id=session_id,
@@ -233,11 +216,9 @@ class TestTicketKeyExtraction:
             for task_desc, expected_ticket in test_cases:
                 async def mock_receive_response():
                     yield AssistantMessage(
-                        type="message",
-                        role="assistant",
+                        model="claude-sonnet-4-5",
                         content=[
                             ToolUseBlock(
-                                type="tool_use",
                                 id=f"task_{expected_ticket}",
                                 name="Task",
                                 input={"agent": "coding", "task": task_desc}
@@ -245,11 +226,8 @@ class TestTicketKeyExtraction:
                         ]
                     )
                     yield UserMessage(
-                        type="message",
-                        role="user",
                         content=[
                             ToolResultBlock(
-                                type="tool_result",
                                 tool_use_id=f"task_{expected_ticket}",
                                 content="Done",
                                 is_error=False
@@ -293,11 +271,9 @@ class TestTokenAttribution:
 
             async def mock_receive_response():
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-51"}
@@ -305,11 +281,8 @@ class TestTokenAttribution:
                     ]
                 )
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -353,11 +326,9 @@ class TestTokenAttribution:
             async def mock_receive_response():
                 for i in range(3):
                     yield AssistantMessage(
-                        type="message",
-                        role="assistant",
+                        model="claude-sonnet-4-5",
                         content=[
                             ToolUseBlock(
-                                type="tool_use",
                                 id=f"task_{i}",
                                 name="Task",
                                 input={"agent": "coding", "task": f"Work on AI-{50+i}"}
@@ -365,11 +336,8 @@ class TestTokenAttribution:
                         ]
                     )
                     yield UserMessage(
-                        type="message",
-                        role="user",
                         content=[
                             ToolResultBlock(
-                                type="tool_result",
                                 tool_use_id=f"task_{i}",
                                 content="Done",
                                 is_error=False
@@ -413,11 +381,9 @@ class TestTimingCapture:
 
             async def mock_receive_response():
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-51"}
@@ -428,11 +394,8 @@ class TestTimingCapture:
                 import asyncio
                 await asyncio.sleep(0.1)
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -481,11 +444,9 @@ class TestErrorHandling:
 
             async def mock_receive_response():
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-51"}
@@ -493,11 +454,8 @@ class TestErrorHandling:
                     ]
                 )
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Error: Failed to compile",
                             is_error=True
@@ -535,10 +493,9 @@ class TestErrorHandling:
 
             async def mock_receive_response():
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
-                        TextBlock(type="text", text="Working on it...")
+                        TextBlock(text="Working on it...")
                     ]
                 )
 
@@ -569,11 +526,9 @@ class TestErrorHandling:
             async def mock_receive_response():
                 # Task with missing or malformed input
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={}  # Missing agent and task fields
@@ -581,11 +536,8 @@ class TestErrorHandling:
                     ]
                 )
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False
@@ -597,7 +549,7 @@ class TestErrorHandling:
 
             # Should not crash even with malformed input
             with mock_client:
-                result = await run_orchestrated_session(
+                await run_orchestrated_session(
                     client=mock_client,
                     project_dir=project_dir,
                     session_id=session_id,
@@ -630,11 +582,9 @@ class TestAgentProfileUpdates:
 
             async def mock_receive_response():
                 yield AssistantMessage(
-                    type="message",
-                    role="assistant",
+                    model="claude-sonnet-4-5",
                     content=[
                         ToolUseBlock(
-                            type="tool_use",
                             id="task_1",
                             name="Task",
                             input={"agent": "coding", "task": "Work on AI-51"}
@@ -642,11 +592,8 @@ class TestAgentProfileUpdates:
                     ]
                 )
                 yield UserMessage(
-                    type="message",
-                    role="user",
                     content=[
                         ToolResultBlock(
-                            type="tool_result",
                             tool_use_id="task_1",
                             content="Done",
                             is_error=False

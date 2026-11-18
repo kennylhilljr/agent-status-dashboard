@@ -9,14 +9,11 @@ This module tests the dashboard.html in a real browser environment to ensure:
 - Visual elements are present
 """
 
-import asyncio
-import json
-import time
 from pathlib import Path
+
 import pytest
-from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from aiohttp import web
-import threading
+from playwright.async_api import async_playwright
 
 
 class TestDashboardBrowser:
@@ -307,6 +304,11 @@ class TestDashboardBrowser:
             # Collect console errors
             page.on('console', lambda msg: errors.append(msg.text) if msg.type == 'error' else None)
             page.on('pageerror', lambda err: errors.append(str(err)))
+
+            # The dashboard opens a live-update WebSocket to the metrics server, which
+            # is not running here. Stub it so the socket opens cleanly instead of
+            # logging a connection-refused error; JS errors are still collected.
+            await page.route_web_socket('ws://localhost:8080/ws', lambda ws: None)
 
             dashboard_path = Path(__file__).parent.parent / 'dashboard.html'
             dashboard_url = f'file://{dashboard_path.absolute()}'

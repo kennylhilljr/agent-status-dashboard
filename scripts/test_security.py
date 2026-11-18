@@ -5,6 +5,7 @@ Security Hook Tests
 
 Tests for the bash command security validation logic.
 Run with: uv run python scripts/test_security.py
+or:       python3 -m pytest scripts/test_security.py
 """
 
 import asyncio
@@ -26,8 +27,116 @@ from security import (
     validate_init_script,
 )
 
+# Commands that SHOULD be blocked by bash_security_hook.
+DANGEROUS_COMMANDS: list[str] = [
+    # Not in allowlist - dangerous system commands
+    "shutdown now",
+    "reboot",
+    "dd if=/dev/zero of=/dev/sda",
+    # rm on dangerous paths (rm is allowed, but dangerous paths are blocked)
+    "rm -rf /",
+    "rm -rf /Users",
+    "rm -rf /etc",
+    # Not in allowlist - common commands excluded from minimal set
+    "wget https://example.com",
+    "kill 12345",
+    "killall node",
+    # pkill with non-dev processes
+    "pkill bash",
+    "pkill chrome",
+    "pkill python",
+    # Shell injection attempts
+    "$(echo pkill) node",
+    'eval "pkill node"',
+    'bash -c "pkill node"',
+    # chmod with disallowed modes
+    "chmod 777 file.sh",
+    "chmod 755 file.sh",
+    "chmod +w file.sh",
+    "chmod -R +x dir/",
+    # Non-init.sh scripts
+    "./setup.sh",
+    "./malicious.sh",
+    "bash script.sh",
+    # git commit without --author (blocked by git validation)
+    "git commit -m 'test'",
+    "git add . && git commit -m 'msg'",
+    # Command chaining with dangerous rm (blocked by rm validation after splitting)
+    "./init.sh; rm -rf /",
+]
 
-def test_hook(command: str, should_block: bool) -> bool:
+
+# Commands that SHOULD be allowed by bash_security_hook.
+SAFE_COMMANDS: list[str] = [
+    # File inspection
+    "ls -la",
+    "cat README.md",
+    "head -100 file.txt",
+    "tail -20 log.txt",
+    "wc -l file.txt",
+    "grep -r pattern src/",
+    # File operations
+    "cp file1.txt file2.txt",
+    "mkdir newdir",
+    "mkdir -p path/to/dir",
+    "touch file.txt",
+    "rm temp.txt",  # rm on safe paths is allowed
+    "rm -rf node_modules",  # rm on project dirs is allowed
+    # Directory
+    "pwd",
+    # Text output (now in allowlist)
+    "echo hello",
+    "echo 'test message'",
+    # HTTP/Network (now in allowlist)
+    "curl https://example.com",
+    "curl -X POST https://api.example.com",
+    # Python (now in allowlist)
+    "python app.py",
+    "python3 script.py",
+    # Node.js development
+    "npm install",
+    "npm run build",
+    "node server.js",
+    # Version control
+    "git status",
+    "git add file.txt",
+    "git push origin main",
+    "git log --oneline -10",
+    'git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "test"',
+    (
+        "git add . && git commit"
+        ' --author="Coding Agent <coding-agent@claude-agents.dev>" -m "msg"'
+    ),
+    # Process management
+    "ps aux",
+    "lsof -i :3000",
+    "sleep 2",
+    # Allowed pkill patterns for dev servers
+    "pkill node",
+    "pkill npm",
+    "pkill -f node",
+    "pkill -f 'node server.js'",
+    "pkill vite",
+    # Chained commands
+    "npm install && npm run build",
+    "ls | grep test",
+    # Full paths
+    "/usr/local/bin/node app.js",
+    # chmod +x (allowed)
+    "chmod +x init.sh",
+    "chmod +x script.sh",
+    "chmod u+x init.sh",
+    "chmod a+x init.sh",
+    # init.sh execution (allowed)
+    "./init.sh",
+    "./init.sh --production",
+    "/path/to/init.sh",
+    # Combined chmod and init.sh
+    "chmod +x init.sh && ./init.sh",
+]
+
+
+def check_hook(command: str, should_block: bool) -> bool:
     """Test a single command against the security hook."""
     # Create a minimal PreToolUseHookInput for testing
     input_data = cast(
@@ -61,7 +170,7 @@ def test_hook(command: str, should_block: bool) -> bool:
     return True
 
 
-def test_extract_commands() -> tuple[int, int]:
+def check_extract_commands() -> tuple[int, int]:
     """Test the command extraction logic."""
     print("\nTesting command extraction:\n")
     passed: int = 0
@@ -89,7 +198,7 @@ def test_extract_commands() -> tuple[int, int]:
     return passed, failed
 
 
-def test_validate_chmod() -> tuple[int, int]:
+def check_validate_chmod() -> tuple[int, int]:
     """Test chmod command validation."""
     print("\nTesting chmod validation:\n")
     passed: int = 0
@@ -132,7 +241,7 @@ def test_validate_chmod() -> tuple[int, int]:
     return passed, failed
 
 
-def test_validate_init_script() -> tuple[int, int]:
+def check_validate_init_script() -> tuple[int, int]:
     """Test init.sh script execution validation."""
     print("\nTesting init.sh validation:\n")
     passed: int = 0
@@ -177,7 +286,7 @@ def test_validate_init_script() -> tuple[int, int]:
     return passed, failed
 
 
-def test_validate_git_command() -> tuple[int, int]:
+def check_validate_git_command() -> tuple[int, int]:
     """Test git commit --author validation."""
     print("\nTesting git commit validation:\n")
     passed: int = 0
@@ -226,6 +335,40 @@ def test_validate_git_command() -> tuple[int, int]:
     return passed, failed
 
 
+# pytest entry points. The check_* helpers above print a PASS/FAIL report and are
+# shared with main(), so standalone execution keeps working unchanged.
+
+
+def test_extract_commands() -> None:
+    _, failed = check_extract_commands()
+    assert failed == 0
+
+
+def test_validate_chmod() -> None:
+    _, failed = check_validate_chmod()
+    assert failed == 0
+
+
+def test_validate_init_script() -> None:
+    _, failed = check_validate_init_script()
+    assert failed == 0
+
+
+def test_validate_git_command() -> None:
+    _, failed = check_validate_git_command()
+    assert failed == 0
+
+
+def test_dangerous_commands_blocked() -> None:
+    not_blocked = [cmd for cmd in DANGEROUS_COMMANDS if not check_hook(cmd, should_block=True)]
+    assert not_blocked == []
+
+
+def test_safe_commands_allowed() -> None:
+    not_allowed = [cmd for cmd in SAFE_COMMANDS if not check_hook(cmd, should_block=False)]
+    assert not_allowed == []
+
+
 def main() -> int:
     print("=" * 70)
     print("  SECURITY HOOK TESTS")
@@ -235,142 +378,39 @@ def main() -> int:
     failed: int = 0
 
     # Test command extraction
-    ext_passed, ext_failed = test_extract_commands()
+    ext_passed, ext_failed = check_extract_commands()
     passed += ext_passed
     failed += ext_failed
 
     # Test chmod validation
-    chmod_passed, chmod_failed = test_validate_chmod()
+    chmod_passed, chmod_failed = check_validate_chmod()
     passed += chmod_passed
     failed += chmod_failed
 
     # Test init.sh validation
-    init_passed, init_failed = test_validate_init_script()
+    init_passed, init_failed = check_validate_init_script()
     passed += init_passed
     failed += init_failed
 
     # Test git commit validation
-    git_passed, git_failed = test_validate_git_command()
+    git_passed, git_failed = check_validate_git_command()
     passed += git_passed
     failed += git_failed
 
     # Commands that SHOULD be blocked
     print("\nCommands that should be BLOCKED:\n")
-    dangerous: list[str] = [
-        # Not in allowlist - dangerous system commands
-        "shutdown now",
-        "reboot",
-        "dd if=/dev/zero of=/dev/sda",
-        # rm on dangerous paths (rm is allowed, but dangerous paths are blocked)
-        "rm -rf /",
-        "rm -rf /Users",
-        "rm -rf /etc",
-        # Not in allowlist - common commands excluded from minimal set
-        "wget https://example.com",
-        "kill 12345",
-        "killall node",
-        # pkill with non-dev processes
-        "pkill bash",
-        "pkill chrome",
-        "pkill python",
-        # Shell injection attempts
-        "$(echo pkill) node",
-        'eval "pkill node"',
-        'bash -c "pkill node"',
-        # chmod with disallowed modes
-        "chmod 777 file.sh",
-        "chmod 755 file.sh",
-        "chmod +w file.sh",
-        "chmod -R +x dir/",
-        # Non-init.sh scripts
-        "./setup.sh",
-        "./malicious.sh",
-        "bash script.sh",
-        # git commit without --author (blocked by git validation)
-        "git commit -m 'test'",
-        "git add . && git commit -m 'msg'",
-        # Command chaining with dangerous rm (blocked by rm validation after splitting)
-        "./init.sh; rm -rf /",
-    ]
 
-    for cmd in dangerous:
-        if test_hook(cmd, should_block=True):
+    for cmd in DANGEROUS_COMMANDS:
+        if check_hook(cmd, should_block=True):
             passed += 1
         else:
             failed += 1
 
     # Commands that SHOULD be allowed
     print("\nCommands that should be ALLOWED:\n")
-    safe: list[str] = [
-        # File inspection
-        "ls -la",
-        "cat README.md",
-        "head -100 file.txt",
-        "tail -20 log.txt",
-        "wc -l file.txt",
-        "grep -r pattern src/",
-        # File operations
-        "cp file1.txt file2.txt",
-        "mkdir newdir",
-        "mkdir -p path/to/dir",
-        "touch file.txt",
-        "rm temp.txt",  # rm on safe paths is allowed
-        "rm -rf node_modules",  # rm on project dirs is allowed
-        # Directory
-        "pwd",
-        # Text output (now in allowlist)
-        "echo hello",
-        "echo 'test message'",
-        # HTTP/Network (now in allowlist)
-        "curl https://example.com",
-        "curl -X POST https://api.example.com",
-        # Python (now in allowlist)
-        "python app.py",
-        "python3 script.py",
-        # Node.js development
-        "npm install",
-        "npm run build",
-        "node server.js",
-        # Version control
-        "git status",
-        "git add file.txt",
-        "git push origin main",
-        "git log --oneline -10",
-        'git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "test"',
-        (
-            "git add . && git commit"
-            ' --author="Coding Agent <coding-agent@claude-agents.dev>" -m "msg"'
-        ),
-        # Process management
-        "ps aux",
-        "lsof -i :3000",
-        "sleep 2",
-        # Allowed pkill patterns for dev servers
-        "pkill node",
-        "pkill npm",
-        "pkill -f node",
-        "pkill -f 'node server.js'",
-        "pkill vite",
-        # Chained commands
-        "npm install && npm run build",
-        "ls | grep test",
-        # Full paths
-        "/usr/local/bin/node app.js",
-        # chmod +x (allowed)
-        "chmod +x init.sh",
-        "chmod +x script.sh",
-        "chmod u+x init.sh",
-        "chmod a+x init.sh",
-        # init.sh execution (allowed)
-        "./init.sh",
-        "./init.sh --production",
-        "/path/to/init.sh",
-        # Combined chmod and init.sh
-        "chmod +x init.sh && ./init.sh",
-    ]
 
-    for cmd in safe:
-        if test_hook(cmd, should_block=False):
+    for cmd in SAFE_COMMANDS:
+        if check_hook(cmd, should_block=False):
             passed += 1
         else:
             failed += 1

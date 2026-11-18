@@ -6,31 +6,46 @@ to be installed. They use mocking to simulate the rich components.
 """
 
 import json
+import sys
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-import sys
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
-# Mock the rich library before importing dashboard
-sys.modules['rich'] = MagicMock()
-sys.modules['rich.console'] = MagicMock()
-sys.modules['rich.layout'] = MagicMock()
-sys.modules['rich.live'] = MagicMock()
-sys.modules['rich.panel'] = MagicMock()
-sys.modules['rich.table'] = MagicMock()
-sys.modules['rich.text'] = MagicMock()
-
-# Now we can import dashboard
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from dashboard import (
-    DashboardRenderer,
-    MetricsFileMonitor,
-    find_metrics_file,
-)
+# Mock the rich library while importing dashboard. The mocks and the mocked
+# dashboard module are removed from sys.modules straight afterwards so that
+# other test modules in the same pytest run still import the real rich.
+_MOCKED_MODULES = [
+    "rich",
+    "rich.console",
+    "rich.layout",
+    "rich.live",
+    "rich.panel",
+    "rich.table",
+    "rich.text",
+]
+_saved_modules = {name: sys.modules.get(name) for name in [*_MOCKED_MODULES, "dashboard"]}
+_scripts_dir = str(Path(__file__).parent.parent / "scripts")
+sys.path.insert(0, _scripts_dir)
+try:
+    for _name in _MOCKED_MODULES:
+        sys.modules[_name] = MagicMock()
+    sys.modules.pop("dashboard", None)
+    from dashboard import (  # noqa: E402 - must run after the mocks above
+        DashboardRenderer,
+        MetricsFileMonitor,
+        find_metrics_file,
+    )
+finally:
+    sys.path.remove(_scripts_dir)
+    for _name, _module in _saved_modules.items():
+        if _module is None:
+            sys.modules.pop(_name, None)
+        else:
+            sys.modules[_name] = _module
 
 
 class TestMetricsFileMonitorMocked:
@@ -163,7 +178,7 @@ class TestDashboardRendererMocked:
     @pytest.fixture
     def sample_state(self):
         """Create a sample DashboardState for testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = (now - timedelta(seconds=30)).isoformat()
 
         return {
@@ -273,7 +288,7 @@ class TestDashboardIntegrationMocked:
                     "coding": {
                         "agent_name": "coding",
                         "success_rate": 1.0,
-                        "last_active": datetime.now(timezone.utc).isoformat(),
+                        "last_active": datetime.now(UTC).isoformat(),
                     }
                 },
                 "events": [],
