@@ -17,25 +17,26 @@ Test Coverage:
 - Integration tests verify calculations work together correctly
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 # Add parent directory to path to import xp_calculations module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from xp_calculations import (
-    calculate_xp_for_successful_invocation,
-    calculate_xp_for_contribution_type,
-    calculate_speed_bonus,
     calculate_error_recovery_bonus,
+    calculate_level_from_xp,
+    calculate_speed_bonus,
     calculate_streak_bonus,
     calculate_total_xp_for_success,
+    calculate_xp_for_contribution_type,
+    calculate_xp_for_next_level,
+    calculate_xp_for_successful_invocation,
+    calculate_xp_progress_in_level,
     get_level_thresholds,
     get_level_title,
-    calculate_level_from_xp,
-    calculate_xp_for_next_level,
-    calculate_xp_progress_in_level,
     update_streak,
 )
 
@@ -819,7 +820,6 @@ class TestIntegrationGameification:
     def test_integration_level_up_sequence(self):
         """Integration test: verify level progression sequence."""
         levels_reached = []
-        xp = 0
 
         # Simulate earning XP to reach each level
         thresholds = get_level_thresholds()
@@ -899,7 +899,6 @@ class TestIntegrationGameification:
     def test_integration_xp_progression_to_max_level(self):
         """Integration test: verify XP path to max level."""
         xp = 0
-        current_level = 1
 
         # Simulate earning XP to reach each level threshold
         thresholds = get_level_thresholds()

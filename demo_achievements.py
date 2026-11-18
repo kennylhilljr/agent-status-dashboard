@@ -6,15 +6,16 @@ and generates evidence of the working feature.
 """
 
 import json
-from datetime import datetime, timezone
-from pathlib import Path
 import sys
+from datetime import UTC, datetime
+from pathlib import Path
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
-from achievements import AchievementRenderer, ACHIEVEMENT_ICONS
 from rich.console import Console
+
+from achievements import ACHIEVEMENT_ICONS, AchievementRenderer
 
 
 def create_demo_metrics():
@@ -23,7 +24,7 @@ def create_demo_metrics():
         "version": 1,
         "project_name": "AI Agent Status Dashboard",
         "created_at": "2026-02-14T00:00:00Z",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "agents": {
             "coding": {
                 "agent_name": "coding",

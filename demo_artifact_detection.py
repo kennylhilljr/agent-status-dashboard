@@ -222,8 +222,8 @@ def demo_tool_specific_detection():
         tool_input={"title": "New feature"},
         tool_output='{"success": true, "issue": {"id": "AI-53"}}'
     )
-    print(f"  Tool: Linear create_issue")
-    print(f"  Output: Created issue AI-53")
+    print("  Tool: Linear create_issue")
+    print("  Output: Created issue AI-53")
     print(f"  Detected: {artifacts_linear}")
 
     # GitHub CreatePullRequest
@@ -234,8 +234,8 @@ def demo_tool_specific_detection():
         tool_input={"title": "Add feature"},
         tool_output='{"number": 125, "url": "https://github.com/..."}'
     )
-    print(f"  Tool: GitHub CreatePullRequest")
-    print(f"  Output: PR #125 created")
+    print("  Tool: GitHub CreatePullRequest")
+    print("  Output: PR #125 created")
     print(f"  Detected: {artifacts_github}")
 
     # GitHub SubmitPullRequestReview (Approve)
@@ -246,8 +246,8 @@ def demo_tool_specific_detection():
         tool_input={"pull_number": 125, "event": "APPROVE"},
         tool_output='{"success": true}'
     )
-    print(f"  Tool: GitHub SubmitPullRequestReview")
-    print(f"  Input: APPROVE PR #125")
+    print("  Tool: GitHub SubmitPullRequestReview")
+    print("  Input: APPROVE PR #125")
     print(f"  Detected: {artifacts_review}")
 
     return artifacts_linear + artifacts_github + artifacts_review

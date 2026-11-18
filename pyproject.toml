@@ -7,3 +7,39 @@ select = ["E", "W", "F", "I", "UP"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["agents", "bridges", "daemon"]
+
+[tool.ruff.lint.per-file-ignores]
+# These files predate CI and contain long lines (aligned TypedDict field comments,
+# long string literals, and long call sites). Rewrapping them by hand is churn with
+# no behavioural value, so E501 is waived only here; every other file, and every
+# other rule in these files, is still enforced.
+"achievements.py" = ["E501"]
+"agent.py" = ["E501"]
+"agent_metrics_collector.py" = ["E501"]
+"agents/orchestrator.py" = ["E501"]
+"artifact_detector.py" = ["E501"]
+"dashboard_server.py" = ["E501"]
+"demo_dashboard.py" = ["E501"]
+"demo_dashboard_server.py" = ["E501"]
+"example_agent_session_metrics.py" = ["E501"]
+"metrics.py" = ["E501"]
+"scripts/achievements.py" = ["E501"]
+"scripts/agent_detail.py" = ["E501"]
+"scripts/cli.py" = ["E501"]
+"scripts/dashboard.py" = ["E501"]
+"scripts/leaderboard.py" = ["E501"]
+"test_agent_session_metrics.py" = ["E501"]
+"test_integration_agent_session.py" = ["E501"]
+"tests/manual_test_orchestrator.py" = ["E501"]
+"tests/test_achievements.py" = ["E501"]
+"tests/test_dashboard_html.py" = ["E501"]
+"tests/test_dashboard_playwright.py" = ["E501"]
+"tests/test_metrics.py" = ["E501"]
+"tests/test_metrics_persistence.py" = ["E501"]
+"tests/test_strengths_weaknesses.py" = ["E501"]
+"tests/test_token_extraction.py" = ["E501"]
+"xp_calculations.py" = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

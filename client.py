@@ -14,16 +14,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, McpServerConfig  # noqa: E402
+from claude_agent_sdk.types import HookCallback, HookMatcher  # noqa: E402
+
+from agents.definitions import AGENT_DEFINITIONS  # noqa: E402
 from arcade_config import (  # noqa: E402
     ALL_ARCADE_TOOLS,
     ARCADE_TOOLS_PERMISSION,
     get_arcade_mcp_config,
     validate_arcade_config,
 )
-from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, McpServerConfig  # noqa: E402
-from claude_agent_sdk.types import HookCallback, HookMatcher  # noqa: E402
-
-from agents.definitions import AGENT_DEFINITIONS  # noqa: E402
 from security import bash_security_hook  # noqa: E402
 
 # Valid permission modes for the Claude SDK

@@ -18,17 +18,15 @@ Usage:
 
 import argparse
 import json
-import os
-import sys
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any
 
+from rich.columns import Columns
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich.columns import Columns
 
 # Default paths
 DEFAULT_METRICS_DIR = Path.home() / ".agent_metrics"
@@ -69,7 +67,7 @@ class AgentDetailRenderer:
         """
         return LEVEL_TITLES.get(level, "Unknown")
 
-    def create_profile_panel(self, agent_data: Dict[str, Any], agent_name: str) -> Panel:
+    def create_profile_panel(self, agent_data: dict[str, Any], agent_name: str) -> Panel:
         """Create agent profile panel with basic information.
 
         Args:
@@ -100,7 +98,7 @@ class AgentDetailRenderer:
 
         return Panel(text, title="Agent Profile", border_style="cyan")
 
-    def create_performance_panel(self, agent_data: Dict[str, Any]) -> Panel:
+    def create_performance_panel(self, agent_data: dict[str, Any]) -> Panel:
         """Create performance metrics panel.
 
         Args:
@@ -154,7 +152,7 @@ class AgentDetailRenderer:
 
         return Panel(text, title="Performance Metrics", border_style="magenta")
 
-    def create_strengths_weaknesses_panel(self, agent_data: Dict[str, Any]) -> Panel:
+    def create_strengths_weaknesses_panel(self, agent_data: dict[str, Any]) -> Panel:
         """Create strengths and weaknesses panel.
 
         Args:
@@ -189,7 +187,7 @@ class AgentDetailRenderer:
 
         return Panel(text, title="Strengths & Weaknesses", border_style="yellow")
 
-    def create_achievements_panel(self, agent_data: Dict[str, Any]) -> Panel:
+    def create_achievements_panel(self, agent_data: dict[str, Any]) -> Panel:
         """Create achievements panel.
 
         Args:
@@ -214,7 +212,7 @@ class AgentDetailRenderer:
 
         return Panel(text, title="Achievements", border_style="yellow")
 
-    def create_recent_events_table(self, events: List[Dict[str, Any]], agent_name: str, limit: int = 10) -> Table:
+    def create_recent_events_table(self, events: list[dict[str, Any]], agent_name: str, limit: int = 10) -> Table:
         """Create table of recent events for this agent.
 
         Args:
@@ -241,7 +239,7 @@ class AgentDetailRenderer:
             table.add_row("No events", "N/A", "N/A", "N/A", "N/A")
             return table
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for event in agent_events:
             # Format time
             started_at = event.get("started_at", "")
@@ -278,7 +276,7 @@ class AgentDetailRenderer:
 
         return table
 
-    def create_detail_view(self, agent_data: Dict[str, Any], agent_name: str, events: List[Dict[str, Any]]) -> Panel:
+    def create_detail_view(self, agent_data: dict[str, Any], agent_name: str, events: list[dict[str, Any]]) -> Panel:
         """Create complete agent detail view.
 
         Args:
@@ -294,8 +292,8 @@ class AgentDetailRenderer:
         performance_panel = self.create_performance_panel(agent_data)
 
         # Create achievements and strengths panels
-        achievements_panel = self.create_achievements_panel(agent_data)
-        strengths_panel = self.create_strengths_weaknesses_panel(agent_data)
+        self.create_achievements_panel(agent_data)
+        self.create_strengths_weaknesses_panel(agent_data)
 
         # Combine panels for display
         columns = Columns([profile_panel, performance_panel])
@@ -309,8 +307,8 @@ class AgentDetailRenderer:
     def render_agent_detail(
         self,
         agent_name: str,
-        agent_data: Dict[str, Any],
-        state: Dict[str, Any]
+        agent_data: dict[str, Any],
+        state: dict[str, Any]
     ) -> None:
         """Render and display complete agent detail view.
 
@@ -391,7 +389,7 @@ class MetricsFileMonitor:
         """
         self.metrics_path = metrics_path
 
-    def load_metrics(self) -> Optional[dict]:
+    def load_metrics(self) -> dict | None:
         """Load metrics from file if it exists.
 
         Returns:
@@ -401,15 +399,15 @@ class MetricsFileMonitor:
             return None
 
         try:
-            with open(self.metrics_path, 'r', encoding='utf-8') as f:
+            with open(self.metrics_path, encoding='utf-8') as f:
                 data = json.load(f)
             return data
-        except (json.JSONDecodeError, IOError, OSError):
+        except (json.JSONDecodeError, OSError):
             # File is corrupted or unreadable
             return None
 
 
-def find_metrics_file(metrics_dir: Optional[Path] = None) -> Path:
+def find_metrics_file(metrics_dir: Path | None = None) -> Path:
     """Find metrics file path.
 
     Searches in the following order:

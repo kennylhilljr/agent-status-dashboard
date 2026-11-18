@@ -25,27 +25,26 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 
 # Add scripts directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from rich.console import Console
-from rich.layout import Layout
-from rich.live import Live
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
+from agent_detail import AgentDetailRenderer
+from dashboard import DEFAULT_REFRESH_RATE_MS as DASHBOARD_REFRESH_RATE_MS
 
 # Import individual module classes
 from dashboard import DashboardRenderer as DashboardRenderer_Main
 from dashboard import MetricsFileMonitor
 from dashboard import find_metrics_file as find_metrics_file_main
-from dashboard import DEFAULT_REFRESH_RATE_MS as DASHBOARD_REFRESH_RATE_MS
 from leaderboard import LeaderboardRenderer
-from agent_detail import AgentDetailRenderer
+from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.panel import Panel
+from rich.text import Text
+
 from achievements import AchievementRenderer
 
 # Default paths
@@ -56,7 +55,7 @@ DEFAULT_METRICS_FILE = "metrics.json"
 class UnifiedDashboardCLI:
     """Unified CLI handler for all dashboard modes."""
 
-    def __init__(self, console: Optional[Console] = None):
+    def __init__(self, console: Console | None = None):
         """Initialize the unified CLI.
 
         Args:
@@ -202,7 +201,7 @@ class UnifiedDashboardCLI:
     def run_achievements(
         self,
         metrics_path: Path,
-        agent_name: Optional[str] = None,
+        agent_name: str | None = None,
         refresh_rate_ms: int = DASHBOARD_REFRESH_RATE_MS,
         once: bool = False
     ) -> None:
@@ -254,8 +253,8 @@ class UnifiedDashboardCLI:
 
     def _render_achievements_single(
         self,
-        state: Dict[str, Any],
-        agent_name: Optional[str],
+        state: dict[str, Any],
+        agent_name: str | None,
         renderer: AchievementRenderer
     ) -> None:
         """Render achievements for single display.
@@ -287,9 +286,9 @@ class UnifiedDashboardCLI:
             project_name = state.get("project_name", "Unknown Project")
             total_agents = len(agents)
             text = Text()
-            text.append(f"Project: ", style="bold")
+            text.append("Project: ", style="bold")
             text.append(f"{project_name}\n", style="cyan bold")
-            text.append(f"Total Agents: ", style="bold")
+            text.append("Total Agents: ", style="bold")
             text.append(f"{total_agents}", style="cyan")
             layout["header"].update(
                 Panel(text, title="Achievements Dashboard", border_style="green")
@@ -313,8 +312,8 @@ class UnifiedDashboardCLI:
 
     def _get_achievements_content(
         self,
-        state: Dict[str, Any],
-        agent_name: Optional[str],
+        state: dict[str, Any],
+        agent_name: str | None,
         renderer: AchievementRenderer
     ) -> Panel:
         """Get achievements content for live display.
@@ -419,7 +418,7 @@ def main():
 
     # Print startup info for non-JSON modes
     if not args.json:
-        console.print(f"[cyan]Agent Status Dashboard CLI[/cyan]")
+        console.print("[cyan]Agent Status Dashboard CLI[/cyan]")
         console.print(f"[dim]Metrics file: {metrics_path}[/dim]")
 
     # Route to appropriate mode

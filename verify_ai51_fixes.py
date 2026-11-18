@@ -10,7 +10,6 @@ This script verifies that all blocking issues from PR #22 have been addressed:
 6. FIXED: pytest added to requirements.txt
 """
 
-import re
 import sys
 from pathlib import Path
 

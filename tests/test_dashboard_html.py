@@ -8,9 +8,9 @@ This module tests the dashboard.html file to ensure:
 - All required components are present
 """
 
-import json
 import re
 from pathlib import Path
+
 import pytest
 
 

@@ -11,8 +11,8 @@ This script:
 
 import asyncio
 import subprocess
-import time
 from pathlib import Path
+
 from playwright.async_api import async_playwright
 
 

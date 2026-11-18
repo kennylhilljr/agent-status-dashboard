@@ -8,7 +8,6 @@ full module imports.
 import asyncio
 import re
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 from agent_metrics_collector import AgentMetricsCollector
@@ -77,11 +76,11 @@ async def simulate_delegation_tracking():
                 if should_fail:
                     tracker.set_error("Simulated error")
 
-            print(f"  ✓ Tracked")
+            print("  ✓ Tracked")
 
         # End session
         collector.end_session(session_id, status="complete")
-        print(f"\n✓ Session ended")
+        print("\n✓ Session ended")
 
         # Verification
         print("\n" + "=" * 70)
@@ -111,7 +110,7 @@ async def simulate_delegation_tracking():
 
         # Check session
         session = state['sessions'][0]
-        print(f"\nSession summary:")
+        print("\nSession summary:")
         print(f"  - Session ID: {session['session_id'][:8]}...")
         print(f"  - Agents invoked: {session['agents_invoked']}")
         print(f"  - Tickets worked: {session['tickets_worked']}")
@@ -123,7 +122,7 @@ async def simulate_delegation_tracking():
         assert session['total_tokens'] == 4500  # 3 × 1500
 
         # Check agent profiles
-        print(f"\nAgent profiles created:")
+        print("\nAgent profiles created:")
         for agent_name in ["coding", "github", "slack"]:
             assert agent_name in state['agents']
             profile = state['agents'][agent_name]
@@ -195,7 +194,7 @@ async def test_error_tracking():
         state = collector.get_state()
         event = state['events'][0]
 
-        print(f"\n✓ Event recorded with error status")
+        print("\n✓ Event recorded with error status")
         print(f"  - Status: {event['status']}")
         print(f"  - Error: {event['error_message']}")
 
@@ -204,7 +203,7 @@ async def test_error_tracking():
 
         # Check agent profile
         profile = state['agents']['coding']
-        print(f"\n✓ Agent profile updated:")
+        print("\n✓ Agent profile updated:")
         print(f"  - Failed invocations: {profile['failed_invocations']}")
         print(f"  - Success rate: {profile['success_rate']:.1%}")
 

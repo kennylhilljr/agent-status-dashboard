@@ -14,13 +14,12 @@ Tests all CLI modes and functionality:
 """
 
 import json
-import tempfile
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+import tempfile
+from datetime import UTC, datetime, timedelta
 from io import StringIO
+from pathlib import Path
 
 import pytest
 from rich.console import Console
@@ -30,7 +29,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from cli import (
     UnifiedDashboardCLI,
-    main as cli_main,
 )
 
 
@@ -50,7 +48,7 @@ class TestUnifiedDashboardCLI:
     @pytest.fixture
     def sample_metrics(self):
         """Create sample metrics data for testing."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = (now - timedelta(seconds=30)).isoformat()
         old = (now - timedelta(hours=2)).isoformat()
 
@@ -290,7 +288,7 @@ class TestCLIArgumentParsing:
             try:
                 json.loads(result.stdout)
                 assert True
-            except:
+            except Exception:
                 # If not valid JSON, should still complete
                 assert result.returncode in [0, 1]
         finally:
@@ -358,7 +356,7 @@ class TestCLIIntegration:
             "version": 1,
             "project_name": "integration-test-project",
             "created_at": "2026-02-14T00:00:00Z",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
             "total_sessions": 3,
             "total_tokens": 10000,
             "total_cost_usd": 0.10,
@@ -372,7 +370,7 @@ class TestCLIIntegration:
                     "total_invocations": 20,
                     "successful_invocations": 17,
                     "failed_invocations": 3,
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                     "total_tokens": 5000,
                     "total_cost_usd": 0.05,
                     "total_duration_seconds": 45.0,
@@ -394,7 +392,7 @@ class TestCLIIntegration:
                     "total_invocations": 16,
                     "successful_invocations": 12,
                     "failed_invocations": 4,
-                    "last_active": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
+                    "last_active": (datetime.now(UTC) - timedelta(hours=1)).isoformat(),
                     "total_tokens": 5000,
                     "total_cost_usd": 0.05,
                     "total_duration_seconds": 45.0,

@@ -13,22 +13,21 @@ Tests all components of the metrics module including:
 """
 
 import json
-import tempfile
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict
-
-import pytest
 
 # Add parent directory to path to import metrics module
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from metrics import (
     AgentEvent,
     AgentProfile,
-    SessionSummary,
     DashboardState,
+    SessionSummary,
 )
 
 
@@ -1408,7 +1407,7 @@ class TestMetricsFileIO:
 
         try:
             # Read back
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 loaded_state = json.load(f)
 
             assert loaded_state == state
@@ -1505,7 +1504,7 @@ class TestMetricsFileIO:
 
         try:
             # Read back
-            with open(temp_path, 'r') as f:
+            with open(temp_path) as f:
                 loaded_state = json.load(f)
 
             # Verify structure

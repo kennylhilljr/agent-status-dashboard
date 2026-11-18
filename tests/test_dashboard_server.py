@@ -12,15 +12,15 @@ Tests cover:
 """
 
 import json
-import pytest
-from pathlib import Path
 from datetime import datetime
-from aiohttp import web
+from pathlib import Path
+
+import pytest
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
 from dashboard_server import DashboardServer
+from metrics import AgentEvent, AgentProfile, DashboardState
 from metrics_store import MetricsStore
-from metrics import DashboardState, AgentProfile, AgentEvent
 
 
 class TestDashboardServer(AioHTTPTestCase):

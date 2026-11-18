@@ -14,30 +14,27 @@ Tests all components of the achievement view including:
 """
 
 import json
+
+# Add parent directory to path to import achievements module
+import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch, Mock
-from typing import Dict
 
 import pytest
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
 
-# Add parent directory to path to import achievements module
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from achievements import (
+    ACHIEVEMENT_DESCRIPTIONS,
+    ACHIEVEMENT_ICONS,
+    ACHIEVEMENT_NAMES,
     AchievementRenderer,
     MetricsFileMonitor,
     find_metrics_file,
-    ACHIEVEMENT_ICONS,
-    ACHIEVEMENT_NAMES,
-    ACHIEVEMENT_DESCRIPTIONS,
-    DEFAULT_METRICS_DIR,
 )
 
 
@@ -132,7 +129,7 @@ class TestAchievementRenderer:
             "strengths": ["fast_execution", "high_success_rate"],
             "weaknesses": [],
             "recent_events": ["evt-1"],
-            "last_active": datetime.now(timezone.utc).isoformat(),
+            "last_active": datetime.now(UTC).isoformat(),
         }
 
     @pytest.fixture
@@ -158,7 +155,7 @@ class TestAchievementRenderer:
             "strengths": [],
             "weaknesses": ["high_error_rate"],
             "recent_events": [],
-            "last_active": datetime.now(timezone.utc).isoformat(),
+            "last_active": datetime.now(UTC).isoformat(),
         }
 
     def test_create_achievements_grid_with_achievements(self, renderer, sample_agent_data_with_achievements):
@@ -359,23 +356,23 @@ class TestMetricsFileMonitor:
         monitor = MetricsFileMonitor(temp_metrics_file)
 
         # First load should indicate change
-        assert monitor.has_changed() == True
+        assert monitor.has_changed() is True
 
         # Second check should not indicate change (no modification)
         time.sleep(0.1)
-        assert monitor.has_changed() == False
+        assert monitor.has_changed() is False
 
         # Modify file
         with open(temp_metrics_file, 'w') as f:
             json.dump({"modified": True}, f)
 
         # Should detect change
-        assert monitor.has_changed() == True
+        assert monitor.has_changed() is True
 
     def test_has_changed_nonexistent_file(self):
         """Test has_changed with nonexistent file."""
         monitor = MetricsFileMonitor(Path("/nonexistent/metrics.json"))
-        assert monitor.has_changed() == False
+        assert monitor.has_changed() is False
 
 
 class TestMetricsFileFinding:
@@ -438,7 +435,7 @@ class TestIntegrationAchievementDisplay:
             "version": 1,
             "project_name": "Test Agent Status Dashboard",
             "created_at": "2026-02-14T00:00:00Z",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
             "total_sessions": 5,
             "total_tokens": 50000,
             "total_cost_usd": 0.50,
@@ -472,7 +469,7 @@ class TestIntegrationAchievementDisplay:
                     "strengths": ["fast_execution", "high_success_rate"],
                     "weaknesses": [],
                     "recent_events": ["evt-1"],
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                 },
                 "testing": {
                     "agent_name": "testing",
@@ -494,7 +491,7 @@ class TestIntegrationAchievementDisplay:
                     "strengths": [],
                     "weaknesses": ["high_error_rate"],
                     "recent_events": ["evt-2"],
-                    "last_active": datetime.now(timezone.utc).isoformat(),
+                    "last_active": datetime.now(UTC).isoformat(),
                 },
             },
             "events": [],

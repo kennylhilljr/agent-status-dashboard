@@ -13,23 +13,23 @@ This test suite provides robust coverage of the detection system to ensure
 reliable and accurate performance profiling across all agents.
 """
 
-import pytest
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+
+import pytest
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from metrics import AgentEvent, AgentProfile, DashboardState
 from strengths_weaknesses import (
-    calculate_rolling_window_stats,
     calculate_agent_percentiles,
+    calculate_rolling_window_stats,
     detect_strengths,
     detect_weaknesses,
-    update_agent_strengths_weaknesses,
     get_strength_description,
     get_weakness_description,
+    update_agent_strengths_weaknesses,
 )
 
 
@@ -37,7 +37,7 @@ class TestRollingWindowStats:
     """Test suite for rolling window statistics calculation."""
 
     @pytest.fixture
-    def sample_events(self) -> List[AgentEvent]:
+    def sample_events(self) -> list[AgentEvent]:
         """Create sample agent events for testing."""
         events = []
         for i in range(30):
@@ -110,7 +110,7 @@ class TestRollingWindowStats:
 
     def test_rolling_window_success_rate_calculation(self):
         """Test success rate calculation in rolling window."""
-        events: List[AgentEvent] = []
+        events: list[AgentEvent] = []
         for i in range(10):
             events.append({
                 "event_id": f"evt-{i}",
@@ -137,7 +137,7 @@ class TestRollingWindowStats:
 
     def test_rolling_window_duration_variance(self):
         """Test duration variance calculation."""
-        events: List[AgentEvent] = []
+        events: list[AgentEvent] = []
         # Create events with varying durations
         durations = [10.0, 20.0, 30.0, 40.0, 50.0]
         for i, duration in enumerate(durations):
@@ -166,7 +166,7 @@ class TestRollingWindowStats:
 
     def test_rolling_window_artifact_counting(self):
         """Test artifact counting in rolling window."""
-        events: List[AgentEvent] = []
+        events: list[AgentEvent] = []
         for i in range(5):
             artifacts = [f"file:test-{j}.py" for j in range(i + 1)]
             events.append({
@@ -227,7 +227,7 @@ class TestPercentileCalculations:
     def multi_agent_state(self) -> DashboardState:
         """Create a dashboard state with multiple agents."""
         # Create events for three agents
-        events: List[AgentEvent] = []
+        events: list[AgentEvent] = []
 
         # Fast agent (coding)
         for i in range(10):
@@ -289,7 +289,7 @@ class TestPercentileCalculations:
                 "model_used": "claude-sonnet-4-5",
             })
 
-        agents: Dict[str, AgentProfile] = {
+        agents: dict[str, AgentProfile] = {
             "coding": {
                 "agent_name": "coding",
                 "total_invocations": 10,
@@ -433,7 +433,7 @@ class TestPercentileCalculations:
 
     def test_percentiles_no_events(self):
         """Test percentiles when agents have no events."""
-        agents: Dict[str, AgentProfile] = {
+        agents: dict[str, AgentProfile] = {
             "coding": {
                 "agent_name": "coding",
                 "total_invocations": 0,
@@ -487,7 +487,7 @@ class TestPercentileCalculations:
             "model_used": "claude-sonnet-4-5",
         }
 
-        agents: Dict[str, AgentProfile] = {
+        agents: dict[str, AgentProfile] = {
             "coding": {
                 "agent_name": "coding",
                 "total_invocations": 1,
@@ -527,7 +527,7 @@ class TestPercentileCalculations:
 
     def test_percentiles_all_equal(self):
         """Test percentiles when all agents have equal metrics."""
-        events: List[AgentEvent] = []
+        events: list[AgentEvent] = []
 
         # Create identical events for all agents
         for agent in ["coding", "github", "linear"]:
@@ -550,7 +550,7 @@ class TestPercentileCalculations:
                     "model_used": "claude-sonnet-4-5",
                 })
 
-        agents: Dict[str, AgentProfile] = {}
+        agents: dict[str, AgentProfile] = {}
         for agent in ["coding", "github", "linear"]:
             agents[agent] = {
                 "agent_name": agent,
@@ -997,7 +997,7 @@ class TestEdgeCases:
             "model_used": "claude-sonnet-4-5",
         }
 
-        agents: Dict[str, AgentProfile] = {
+        agents: dict[str, AgentProfile] = {
             "coding": {
                 "agent_name": "coding",
                 "total_invocations": 1,
@@ -1036,8 +1036,8 @@ class TestEdgeCases:
 
     def test_all_equal_metrics_edge_case(self):
         """Test when all agents have identical metrics (no variation)."""
-        events: List[AgentEvent] = []
-        agents: Dict[str, AgentProfile] = {}
+        events: list[AgentEvent] = []
+        agents: dict[str, AgentProfile] = {}
 
         # Create identical events for 3 agents, with lower success rate so no high_success_rate strength
         for agent in ["agent1", "agent2", "agent3"]:
@@ -1094,7 +1094,7 @@ class TestEdgeCases:
         # When equal, some will get higher ranking than others (0.0, 0.5, 1.0)
         # But none should get absolute strengths/weaknesses with equal performance
         for agent_name in ["agent1", "agent2", "agent3"]:
-            strengths = result["agents"][agent_name]["strengths"]
+            result["agents"][agent_name]["strengths"]  # must exist
             weaknesses = result["agents"][agent_name]["weaknesses"]
             # With 80% success rate, no high_error_rate weakness
             assert "high_error_rate" not in weaknesses
@@ -1103,8 +1103,8 @@ class TestEdgeCases:
 
     def test_outliers_edge_case(self):
         """Test when one agent is a significant outlier."""
-        events: List[AgentEvent] = []
-        agents: Dict[str, AgentProfile] = {}
+        events: list[AgentEvent] = []
+        agents: dict[str, AgentProfile] = {}
 
         # Create normal agents
         for agent in ["normal1", "normal2"]:
@@ -1261,7 +1261,7 @@ class TestIntegration:
     def test_full_update_flow(self):
         """Test complete flow of updating agent strengths/weaknesses."""
         # Create events for multiple agents with different characteristics
-        events: List[AgentEvent] = []
+        events: list[AgentEvent] = []
 
         # Fast, successful agent
         for i in range(20):
@@ -1303,7 +1303,7 @@ class TestIntegration:
                 "model_used": "claude-sonnet-4-5",
             })
 
-        agents: Dict[str, AgentProfile] = {
+        agents: dict[str, AgentProfile] = {
             "fast_agent": {
                 "agent_name": "fast_agent",
                 "total_invocations": 20,
