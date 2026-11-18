@@ -1,0 +1,26 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard
+configfile: pyproject.toml
+plugins: asyncio-1.2.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 31 items
+
+tests/test_metrics_persistence.py::TestAtomicWrites::test_atomic_write_creates_file PASSED [  3%]
+tests/test_metrics_persistence.py::TestAtomicWrites::test_atomic_write_data_integrity PASSED [  6%]
+tests/test_metrics_persistence.py::TestAtomicWrites::test_atomic_write_creates_backup PASSED [  9%]
+tests/test_metrics_persistence.py::TestAtomicWrites::test_atomic_write_temp_file_cleanup PASSED [ 12%]
+tests/test_metrics_persistence.py::TestAtomicWrites::test_atomic_write_handles_large_json PASSED [ 16%]
+tests/test_metrics_persistence.py::TestAtomicWrites::test_atomic_write_fsync_called PASSED [ 19%]
+tests/test_metrics_persistence.py::TestAtomicWrites::test_atomic_write_replace_called PASSED [ 22%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_recovery_from_invalid_json PASSED [ 25%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_recovery_from_missing_fields PASSED [ 29%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_recovery_from_wrong_field_types PASSED [ 32%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_recovery_from_backup_when_main_corrupted PASSED [ 35%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_recovery_creates_fresh_state_if_both_corrupted PASSED [ 38%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_recovery_fresh_state_if_no_files PASSED [ 41%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_partial_corruption_recovery PASSED [ 45%]
+tests/test_metrics_persistence.py::TestCorruptionRecovery::test_validate_state_checks_structure PASSED [ 48%]
+tests/test_metrics_persistence.py::TestConcurrentWrites::test_thread_safe_concurrent_writes PASSED [ 51%]
+tests/test_metrics_persistence.py::TestConcurrentWrites::test_thread_lock_prevents_race_conditions 

@@ -1,0 +1,472 @@
+{
+  "version": 1,
+  "project_name": "my-project",
+  "created_at": "2026-02-14T22:42:51.853730Z",
+  "updated_at": "2026-02-15T01:23:58.613932Z",
+  "total_sessions": 10,
+  "total_tokens": 24300,
+  "total_cost_usd": 0.24089999999999998,
+  "total_duration_seconds": 6.699562072753906e-05,
+  "agents": {
+    "coding": {
+      "agent_name": "coding",
+      "total_invocations": 6,
+      "successful_invocations": 6,
+      "failed_invocations": 0,
+      "total_tokens": 22000,
+      "total_cost_usd": 0.234,
+      "total_duration_seconds": 3.790855407714844e-05,
+      "commits_made": 0,
+      "prs_created": 0,
+      "prs_merged": 0,
+      "files_created": 4,
+      "files_modified": 0,
+      "lines_added": 0,
+      "lines_removed": 0,
+      "tests_written": 0,
+      "issues_created": 0,
+      "issues_completed": 0,
+      "messages_sent": 0,
+      "reviews_completed": 0,
+      "success_rate": 1.0,
+      "avg_duration_seconds": 6.318092346191406e-06,
+      "avg_tokens_per_call": 3666.6666666666665,
+      "cost_per_success_usd": 0.039,
+      "xp": 0,
+      "level": 1,
+      "current_streak": 6,
+      "best_streak": 6,
+      "achievements": [],
+      "strengths": [],
+      "weaknesses": [],
+      "recent_events": [
+        "f564d7d4-53fd-4fc5-9562-166c0f620ded",
+        "70820da4-7d5e-4242-b90d-b2ef0dc8f2fb",
+        "d2b59e01-a93e-4714-8ec8-7b330bb49930",
+        "1300a931-d49e-41a6-9b50-c218dabc91b1",
+        "b5fee799-05a4-4206-851d-757d56e218b6",
+        "d9ab0958-7c86-4d4b-8309-ec8cc8593074"
+      ],
+      "last_error": "",
+      "last_active": "2026-02-15T01:23:58.608897Z"
+    },
+    "github": {
+      "agent_name": "github",
+      "total_invocations": 2,
+      "successful_invocations": 2,
+      "failed_invocations": 0,
+      "total_tokens": 2000,
+      "total_cost_usd": 0.0048000000000000004,
+      "total_duration_seconds": 8.106231689453125e-06,
+      "commits_made": 2,
+      "prs_created": 2,
+      "prs_merged": 0,
+      "files_created": 0,
+      "files_modified": 0,
+      "lines_added": 0,
+      "lines_removed": 0,
+      "tests_written": 0,
+      "issues_created": 0,
+      "issues_completed": 0,
+      "messages_sent": 0,
+      "reviews_completed": 0,
+      "success_rate": 1.0,
+      "avg_duration_seconds": 4.0531158447265625e-06,
+      "avg_tokens_per_call": 1000.0,
+      "cost_per_success_usd": 0.0024000000000000002,
+      "xp": 0,
+      "level": 1,
+      "current_streak": 2,
+      "best_streak": 2,
+      "achievements": [],
+      "strengths": [],
+      "weaknesses": [],
+      "recent_events": [
+        "a47fe27f-c42f-469e-af6d-031ec47ae0d9",
+        "b4f08ba2-da2b-4fa5-92fd-74c3bf0b2cfb"
+      ],
+      "last_error": "",
+      "last_active": "2026-02-14T22:45:02.375619Z"
+    },
+    "linear": {
+      "agent_name": "linear",
+      "total_invocations": 2,
+      "successful_invocations": 0,
+      "failed_invocations": 2,
+      "total_tokens": 300,
+      "total_cost_usd": 0.0021000000000000003,
+      "total_duration_seconds": 2.09808349609375e-05,
+      "commits_made": 0,
+      "prs_created": 0,
+      "prs_merged": 0,
+      "files_created": 0,
+      "files_modified": 0,
+      "lines_added": 0,
+      "lines_removed": 0,
+      "tests_written": 0,
+      "issues_created": 0,
+      "issues_completed": 0,
+      "messages_sent": 0,
+      "reviews_completed": 0,
+      "success_rate": 0.0,
+      "avg_duration_seconds": 1.049041748046875e-05,
+      "avg_tokens_per_call": 150.0,
+      "cost_per_success_usd": 0.0,
+      "xp": 0,
+      "level": 1,
+      "current_streak": 0,
+      "best_streak": 0,
+      "achievements": [],
+      "strengths": [],
+      "weaknesses": [],
+      "recent_events": [
+        "e31c5b94-2211-4d94-ae01-2bdd6d661c0b",
+        "1583c65a-8bf1-436f-ad7d-436510a19b27"
+      ],
+      "last_error": "Simulated error",
+      "last_active": "2026-02-14T22:45:02.377118Z"
+    }
+  },
+  "events": [
+    {
+      "event_id": "f564d7d4-53fd-4fc5-9562-166c0f620ded",
+      "agent_name": "coding",
+      "session_id": "d8c4e3ce-f3f3-42b9-9a21-0c27bb301e87",
+      "ticket_key": "AI-46",
+      "started_at": "2026-02-14T22:42:51.853686Z",
+      "ended_at": "2026-02-14T22:42:51.853694Z",
+      "duration_seconds": 5.7220458984375e-06,
+      "status": "success",
+      "input_tokens": 2000,
+      "output_tokens": 3000,
+      "total_tokens": 5000,
+      "estimated_cost_usd": 0.051,
+      "artifacts": [
+        "file:created:agent_metrics_collector.py",
+        "file:created:test_agent_metrics_collector.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "a47fe27f-c42f-469e-af6d-031ec47ae0d9",
+      "agent_name": "github",
+      "session_id": "d8c4e3ce-f3f3-42b9-9a21-0c27bb301e87",
+      "ticket_key": "AI-46",
+      "started_at": "2026-02-14T22:42:51.855129Z",
+      "ended_at": "2026-02-14T22:42:51.855135Z",
+      "duration_seconds": 4.0531158447265625e-06,
+      "status": "success",
+      "input_tokens": 500,
+      "output_tokens": 500,
+      "total_tokens": 1000,
+      "estimated_cost_usd": 0.0024000000000000002,
+      "artifacts": [
+        "commit:abc123",
+        "pr:created:#46"
+      ],
+      "error_message": "",
+      "model_used": "claude-haiku-4-5"
+    },
+    {
+      "event_id": "e31c5b94-2211-4d94-ae01-2bdd6d661c0b",
+      "agent_name": "linear",
+      "session_id": "d8c4e3ce-f3f3-42b9-9a21-0c27bb301e87",
+      "ticket_key": "AI-46",
+      "started_at": "2026-02-14T22:42:51.856637Z",
+      "ended_at": "2026-02-14T22:42:51.856647Z",
+      "duration_seconds": 1.0013580322265625e-05,
+      "status": "error",
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "total_tokens": 150,
+      "estimated_cost_usd": 0.0010500000000000002,
+      "artifacts": [],
+      "error_message": "Simulated error",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "70820da4-7d5e-4242-b90d-b2ef0dc8f2fb",
+      "agent_name": "coding",
+      "session_id": "0d9290ee-fb39-4df3-8d83-953e655798ab",
+      "ticket_key": "AI-46",
+      "started_at": "2026-02-14T22:45:02.373392Z",
+      "ended_at": "2026-02-14T22:45:02.373402Z",
+      "duration_seconds": 5.7220458984375e-06,
+      "status": "success",
+      "input_tokens": 2000,
+      "output_tokens": 3000,
+      "total_tokens": 5000,
+      "estimated_cost_usd": 0.051,
+      "artifacts": [
+        "file:created:agent_metrics_collector.py",
+        "file:created:test_agent_metrics_collector.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "b4f08ba2-da2b-4fa5-92fd-74c3bf0b2cfb",
+      "agent_name": "github",
+      "session_id": "0d9290ee-fb39-4df3-8d83-953e655798ab",
+      "ticket_key": "AI-46",
+      "started_at": "2026-02-14T22:45:02.375612Z",
+      "ended_at": "2026-02-14T22:45:02.375619Z",
+      "duration_seconds": 4.0531158447265625e-06,
+      "status": "success",
+      "input_tokens": 500,
+      "output_tokens": 500,
+      "total_tokens": 1000,
+      "estimated_cost_usd": 0.0024000000000000002,
+      "artifacts": [
+        "commit:abc123",
+        "pr:created:#46"
+      ],
+      "error_message": "",
+      "model_used": "claude-haiku-4-5"
+    },
+    {
+      "event_id": "1583c65a-8bf1-436f-ad7d-436510a19b27",
+      "agent_name": "linear",
+      "session_id": "0d9290ee-fb39-4df3-8d83-953e655798ab",
+      "ticket_key": "AI-46",
+      "started_at": "2026-02-14T22:45:02.377106Z",
+      "ended_at": "2026-02-14T22:45:02.377118Z",
+      "duration_seconds": 1.0967254638671875e-05,
+      "status": "error",
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "total_tokens": 150,
+      "estimated_cost_usd": 0.0010500000000000002,
+      "artifacts": [],
+      "error_message": "Simulated error",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "d2b59e01-a93e-4714-8ec8-7b330bb49930",
+      "agent_name": "coding",
+      "session_id": "78a83e91-1e2e-4fd2-85ba-8c48e6570cae",
+      "ticket_key": "AI-TEST",
+      "started_at": "2026-02-15T01:23:30.246640Z",
+      "ended_at": "2026-02-15T01:23:30.246776Z",
+      "duration_seconds": 5.9604644775390625e-06,
+      "status": "success",
+      "input_tokens": 1000,
+      "output_tokens": 2000,
+      "total_tokens": 3000,
+      "estimated_cost_usd": 0.033,
+      "artifacts": [
+        "file:test.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "1300a931-d49e-41a6-9b50-c218dabc91b1",
+      "agent_name": "coding",
+      "session_id": "61d8e881-f687-4a4b-847e-462a8c1769e6",
+      "ticket_key": "AI-TEST",
+      "started_at": "2026-02-15T01:23:36.950436Z",
+      "ended_at": "2026-02-15T01:23:36.950616Z",
+      "duration_seconds": 7.152557373046875e-06,
+      "status": "success",
+      "input_tokens": 1000,
+      "output_tokens": 2000,
+      "total_tokens": 3000,
+      "estimated_cost_usd": 0.033,
+      "artifacts": [
+        "file:test.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "b5fee799-05a4-4206-851d-757d56e218b6",
+      "agent_name": "coding",
+      "session_id": "7578f68f-d17b-4115-bff3-048692d8c098",
+      "ticket_key": "AI-TEST",
+      "started_at": "2026-02-15T01:23:50.251244Z",
+      "ended_at": "2026-02-15T01:23:50.251403Z",
+      "duration_seconds": 6.198883056640625e-06,
+      "status": "success",
+      "input_tokens": 1000,
+      "output_tokens": 2000,
+      "total_tokens": 3000,
+      "estimated_cost_usd": 0.033,
+      "artifacts": [
+        "file:test.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    },
+    {
+      "event_id": "d9ab0958-7c86-4d4b-8309-ec8cc8593074",
+      "agent_name": "coding",
+      "session_id": "2de54b02-f16c-4cf5-981f-b290eea0aed7",
+      "ticket_key": "AI-TEST",
+      "started_at": "2026-02-15T01:23:58.608708Z",
+      "ended_at": "2026-02-15T01:23:58.608897Z",
+      "duration_seconds": 7.152557373046875e-06,
+      "status": "success",
+      "input_tokens": 1000,
+      "output_tokens": 2000,
+      "total_tokens": 3000,
+      "estimated_cost_usd": 0.033,
+      "artifacts": [
+        "file:test.py"
+      ],
+      "error_message": "",
+      "model_used": "claude-sonnet-4-5"
+    }
+  ],
+  "sessions": [
+    {
+      "session_id": "d8c4e3ce-f3f3-42b9-9a21-0c27bb301e87",
+      "session_number": 1,
+      "session_type": "initializer",
+      "started_at": "2026-02-14T22:42:51.852639Z",
+      "ended_at": "2026-02-14T22:42:51.857954Z",
+      "status": "complete",
+      "agents_invoked": [
+        "coding",
+        "github",
+        "linear"
+      ],
+      "total_tokens": 6150,
+      "total_cost_usd": 0.05445,
+      "tickets_worked": [
+        "AI-46"
+      ]
+    },
+    {
+      "session_id": "0d9290ee-fb39-4df3-8d83-953e655798ab",
+      "session_number": 2,
+      "session_type": "initializer",
+      "started_at": "2026-02-14T22:45:02.372018Z",
+      "ended_at": "2026-02-14T22:45:02.378765Z",
+      "status": "complete",
+      "agents_invoked": [
+        "coding",
+        "github",
+        "linear"
+      ],
+      "total_tokens": 6150,
+      "total_cost_usd": 0.05445,
+      "tickets_worked": [
+        "AI-46"
+      ]
+    },
+    {
+      "session_id": "78a83e91-1e2e-4fd2-85ba-8c48e6570cae",
+      "session_number": 3,
+      "session_type": "continuation",
+      "started_at": "2026-02-15T01:23:30.246650Z",
+      "ended_at": "2026-02-15T01:23:30.249467Z",
+      "status": "complete",
+      "agents_invoked": [
+        "coding"
+      ],
+      "total_tokens": 3000,
+      "total_cost_usd": 0.033,
+      "tickets_worked": [
+        "AI-TEST"
+      ]
+    },
+    {
+      "session_id": "65fa2759-ca70-4a99-b5df-68879cd3cf98",
+      "session_number": 3,
+      "session_type": "initializer",
+      "started_at": "2026-02-15T01:23:30.245370Z",
+      "ended_at": "2026-02-15T01:23:30.251034Z",
+      "status": "complete",
+      "agents_invoked": [],
+      "total_tokens": 0,
+      "total_cost_usd": 0.0,
+      "tickets_worked": []
+    },
+    {
+      "session_id": "61d8e881-f687-4a4b-847e-462a8c1769e6",
+      "session_number": 5,
+      "session_type": "continuation",
+      "started_at": "2026-02-15T01:23:36.950450Z",
+      "ended_at": "2026-02-15T01:23:36.953269Z",
+      "status": "complete",
+      "agents_invoked": [
+        "coding"
+      ],
+      "total_tokens": 3000,
+      "total_cost_usd": 0.033,
+      "tickets_worked": [
+        "AI-TEST"
+      ]
+    },
+    {
+      "session_id": "551b2d16-5464-4006-8da4-95aac494744c",
+      "session_number": 5,
+      "session_type": "initializer",
+      "started_at": "2026-02-15T01:23:36.948745Z",
+      "ended_at": "2026-02-15T01:23:36.955327Z",
+      "status": "complete",
+      "agents_invoked": [],
+      "total_tokens": 0,
+      "total_cost_usd": 0.0,
+      "tickets_worked": []
+    },
+    {
+      "session_id": "7578f68f-d17b-4115-bff3-048692d8c098",
+      "session_number": 7,
+      "session_type": "continuation",
+      "started_at": "2026-02-15T01:23:50.251255Z",
+      "ended_at": "2026-02-15T01:23:50.253852Z",
+      "status": "complete",
+      "agents_invoked": [
+        "coding"
+      ],
+      "total_tokens": 3000,
+      "total_cost_usd": 0.033,
+      "tickets_worked": [
+        "AI-TEST"
+      ]
+    },
+    {
+      "session_id": "ee2cb17c-55e8-4005-a3fe-996f3e1e5095",
+      "session_number": 7,
+      "session_type": "initializer",
+      "started_at": "2026-02-15T01:23:50.250120Z",
+      "ended_at": "2026-02-15T01:23:50.255515Z",
+      "status": "complete",
+      "agents_invoked": [],
+      "total_tokens": 0,
+      "total_cost_usd": 0.0,
+      "tickets_worked": []
+    },
+    {
+      "session_id": "2de54b02-f16c-4cf5-981f-b290eea0aed7",
+      "session_number": 9,
+      "session_type": "continuation",
+      "started_at": "2026-02-15T01:23:58.608721Z",
+      "ended_at": "2026-02-15T01:23:58.611662Z",
+      "status": "complete",
+      "agents_invoked": [
+        "coding"
+      ],
+      "total_tokens": 3000,
+      "total_cost_usd": 0.033,
+      "tickets_worked": [
+        "AI-TEST"
+      ]
+    },
+    {
+      "session_id": "475bd4aa-544c-4a93-ad2b-aaa0a1c28639",
+      "session_number": 9,
+      "session_type": "initializer",
+      "started_at": "2026-02-15T01:23:58.607409Z",
+      "ended_at": "2026-02-15T01:23:58.613722Z",
+      "status": "complete",
+      "agents_invoked": [],
+      "total_tokens": 0,
+      "total_cost_usd": 0.0,
+      "tickets_worked": []
+    }
+  ]
+}

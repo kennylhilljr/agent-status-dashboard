@@ -1,0 +1,46 @@
+============================================================
+CLI VERIFICATION TEST SUITE
+============================================================
+
+=== Testing Dashboard CLI ===
+✓ Found metrics file: /Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard/.agent_metrics.json
+✓ Loaded metrics successfully
+  - Project: my-project
+  - Agents: 3
+  - Events: 10
+  - Sessions: 10
+✓ Created project header
+✓ Created agent status table
+✓ Created metrics panel
+✓ Created complete dashboard layout
+✓ Dashboard shows 3 agents:
+  - coding: 6 invocations, 100.0% success
+  - github: 2 invocations, 100.0% success
+  - linear: 2 invocations, 0.0% success
+
+=== Testing Leaderboard CLI ===
+✓ Found metrics file: /Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard/.agent_metrics.json
+✓ Loaded metrics successfully
+✓ Created project header
+✓ Created leaderboard table
+✓ Created complete leaderboard layout
+✓ Leaderboard shows 3 agents sorted by XP:
+  #1 coding: Level 1, 0 XP, 100.0% success
+  #2 github: Level 1, 0 XP, 100.0% success
+  #3 linear: Level 1, 0 XP, 0.0% success
+
+=== Testing CLI Scripts Exist ===
+✓ Dashboard script exists: scripts/dashboard.py
+✓ Leaderboard script exists: scripts/leaderboard.py
+✓ Dashboard has correct shebang
+✓ Leaderboard has correct shebang
+
+============================================================
+VERIFICATION RESULTS
+============================================================
+✓ DASHBOARD: PASS
+✓ LEADERBOARD: PASS
+✓ CLI_SCRIPTS: PASS
+============================================================
+
+✓ ALL TESTS PASSED

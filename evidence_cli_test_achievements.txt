@@ -1,0 +1,29 @@
+Agent Status Dashboard CLI
+Metrics file: 
+/Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboar
+d/.agent_metrics.json
+╭─────────────────────────── Achievements Dashboard ───────────────────────────╮
+│ Project: my-project                                                          │
+│ Total Agents: 3                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ coding:                                                                      │
+│   No achievements yet                                                        │
+│                                                                              │
+│ github:                                                                      │
+│   No achievements yet                                                        │
+│                                                                              │
+│ linear:                                                                      │
+│   No achievements yet                                                        │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
