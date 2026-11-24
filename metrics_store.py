@@ -228,22 +228,36 @@ class MetricsStore:
             return data
         return None
 
-    def _quarantine(self, path: Path) -> Path:
-        """Move a corrupted file aside so it is never overwritten.
+    def _quarantine(self, path: Path, keep_original: bool = False) -> Path:
+        """Preserve a corrupted file under a new, unused name.
+
+        Uses a hard link, which never overwrites an existing file, so earlier
+        quarantined copies are kept. With keep_original=False the original
+        name is then removed.
 
         Returns:
-            The path the file was moved to.
+            The path the corrupted bytes are preserved at.
         """
         stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
-        target = path.with_name(f"{path.name}.corrupt-{stamp}")
-        os.replace(path, target)
+        n = 0
+        while True:
+            suffix = f".corrupt-{stamp}" + (f"-{n}" if n else "")
+            target = path.with_name(path.name + suffix)
+            try:
+                os.link(path, target)
+                break
+            except FileExistsError:
+                n += 1
+        if not keep_original:
+            os.unlink(path)
         return target
 
     def _load_locked(self) -> DashboardState:
         """Load state from disk. Caller must hold both locks.
 
-        Returns an empty state only when no metrics file exists. If the main
-        file is corrupted, it is restored from the backup. If both are
+        Returns an empty state only when there is no usable data on disk. If
+        the main file is missing or corrupted, it is restored from a valid
+        backup. If both are
         corrupted, they are moved aside (``*.corrupt-<timestamp>``) before a
         fresh state is returned, so a later save() cannot destroy them.
 
@@ -251,6 +265,15 @@ class MetricsStore:
             OSError: If a metrics file exists but cannot be read.
         """
         if not self.metrics_path.exists():
+            # A valid backup without a main file (e.g. the main file was
+            # deleted) is restored rather than replaced by an empty state,
+            # since the next save would otherwise overwrite that backup.
+            if self.backup_path.exists():
+                backup = self._read_state_file(self.backup_path)
+                if backup is not None:
+                    self._atomic_write(self.metrics_path, backup)
+                    return backup  # type: ignore
+                self._quarantine(self.backup_path)
             return self._create_empty_state()
 
         data = self._read_state_file(self.metrics_path)
@@ -261,8 +284,9 @@ class MetricsStore:
         if self.backup_path.exists():
             backup = self._read_state_file(self.backup_path)
             if backup is not None:
-                # Keep the corrupted main file for inspection, then restore
-                self._quarantine(self.metrics_path)
+                # Keep a copy of the corrupted main file for inspection, then
+                # replace it atomically, so the main file is never missing.
+                self._quarantine(self.metrics_path, keep_original=True)
                 self._atomic_write(self.metrics_path, backup)
                 return backup  # type: ignore
             self._quarantine(self.backup_path)

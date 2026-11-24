@@ -140,3 +140,34 @@ def test_concurrent_collectors_do_not_lose_events_or_reuse_session_numbers(tmp_p
     assert state["total_sessions"] == workers
     numbers = sorted(s["session_number"] for s in state["sessions"])
     assert numbers == list(range(1, workers + 1))
+
+
+def test_missing_main_with_valid_backup_restores_instead_of_overwriting(seeded):
+    store = MetricsStore(project_name="p", metrics_dir=seeded)
+    backup_events = len(json.loads(store.backup_path.read_text())["events"])
+    assert backup_events > 0
+    store.metrics_path.unlink()
+
+    # Two writes: the second would previously have overwritten the backup
+    for _ in range(2):
+        store.update(lambda s: s["events"].append(dict(s["events"][-1])))
+
+    assert len(store.load()["events"]) == backup_events + 2
+
+
+def test_quarantine_never_overwrites_existing_copy(seeded, monkeypatch):
+    store = MetricsStore(project_name="p", metrics_dir=seeded)
+
+    class FixedDatetime:
+        @staticmethod
+        def utcnow():
+            from datetime import datetime
+            return datetime(2026, 1, 1)
+
+    monkeypatch.setattr("metrics_store.datetime", FixedDatetime)
+    store.metrics_path.write_text("first")
+    a = store._quarantine(store.metrics_path)
+    store.metrics_path.write_text("second")
+    b = store._quarantine(store.metrics_path)
+    assert a != b
+    assert (a.read_text(), b.read_text()) == ("first", "second")
