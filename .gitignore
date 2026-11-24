@@ -43,5 +43,7 @@ verification_files/
 
 # MCP and tools
 .playwright-mcp/
-.claude/.agent_metrics.json.corrupt-*
+.claude/
+# Corrupted metrics files moved aside by MetricsStore (kept for inspection)
+.agent_metrics.json.corrupt-*
 .agent_metrics.json.bak.corrupt-*
