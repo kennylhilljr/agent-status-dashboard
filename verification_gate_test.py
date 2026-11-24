@@ -4,8 +4,8 @@ Verification Gate Test - End-to-End Feature Verification
 Tests all completed CLI dashboard features to ensure no regressions.
 """
 
-import subprocess
 import json
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -81,7 +81,11 @@ def main():
         "name": "CLI Dashboard --once",
         "status": "PASS" if success else "FAIL",
         "evidence": save_evidence("dashboard_once", output, evidence_dir),
-        "validation": "Dashboard renders with agent status table" if "Agent Status" in output else "Missing expected content"
+        "validation": (
+            "Dashboard renders with agent status table"
+            if "Agent Status" in output
+            else "Missing expected content"
+        ),
     })
 
     # Test 2: CLI JSON output mode
@@ -106,7 +110,11 @@ def main():
         "name": "CLI Leaderboard",
         "status": "PASS" if success else "FAIL",
         "evidence": save_evidence("leaderboard", output, evidence_dir),
-        "validation": "Leaderboard renders with agent rankings" if "Agent Leaderboard" in output else "Missing expected content"
+        "validation": (
+            "Leaderboard renders with agent rankings"
+            if "Agent Leaderboard" in output
+            else "Missing expected content"
+        ),
     })
 
     # Test 4: CLI Achievements mode
@@ -118,7 +126,11 @@ def main():
         "name": "CLI Achievements",
         "status": "PASS" if success else "FAIL",
         "evidence": save_evidence("achievements", output, evidence_dir),
-        "validation": "Achievements dashboard renders" if "Achievements Dashboard" in output else "Missing expected content"
+        "validation": (
+            "Achievements dashboard renders"
+            if "Achievements Dashboard" in output
+            else "Missing expected content"
+        ),
     })
 
     # Test 5: CLI Agent Detail mode
@@ -130,7 +142,11 @@ def main():
         "name": "CLI Agent Detail",
         "status": "PASS" if success else "FAIL",
         "evidence": save_evidence("agent_detail", output, evidence_dir),
-        "validation": "Agent profile renders with metrics" if "Agent Profile" in output and "Performance Metrics" in output else "Missing expected content"
+        "validation": (
+            "Agent profile renders with metrics"
+            if "Agent Profile" in output and "Performance Metrics" in output
+            else "Missing expected content"
+        ),
     })
 
     # Test 6: Metrics Collection System
@@ -317,12 +333,16 @@ def generate_html_report(tests, passed, total):
         <div style="margin-top: 30px; padding: 20px; background: white; border-radius: 8px;">
             <h2>Tested Features</h2>
             <ul>
-                <li><strong>CLI Dashboard --once:</strong> Main dashboard display with agent status table</li>
-                <li><strong>CLI JSON Output:</strong> JSON export functionality for programmatic access</li>
+                <li><strong>CLI Dashboard --once:</strong>
+                    Main dashboard display with agent status table</li>
+                <li><strong>CLI JSON Output:</strong>
+                    JSON export functionality for programmatic access</li>
                 <li><strong>CLI Leaderboard:</strong> Agent ranking system sorted by XP</li>
                 <li><strong>CLI Achievements:</strong> Achievement tracking and display system</li>
-                <li><strong>CLI Agent Detail:</strong> Detailed drill-down view for individual agents</li>
-                <li><strong>Metrics Collection:</strong> Core metrics storage and retrieval system</li>
+                <li><strong>CLI Agent Detail:</strong>
+                    Detailed drill-down view for individual agents</li>
+                <li><strong>Metrics Collection:</strong>
+                    Core metrics storage and retrieval system</li>
             </ul>
         </div>
     </body>

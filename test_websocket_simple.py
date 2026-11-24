@@ -1,12 +1,22 @@
 """Simple WebSocket test without Playwright - validates server functionality."""
 
 import asyncio
-import aiohttp
-import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import aiohttp
+import pytest
+
+from metrics import AgentProfile, DashboardState
 from metrics_store import MetricsStore
-from metrics import DashboardState, AgentProfile
+
+# Manual demonstration, not a unit test: it starts dashboard_server.py on port 8080
+# and writes metrics into the working directory. tests/test_websocket.py covers the
+# WebSocket endpoint. Run this directly with `python test_websocket_simple.py`.
+pytestmark = pytest.mark.skip(
+    reason="manual script: starts a local server on port 8080 and writes metrics to the "
+    "working directory; run it directly with python"
+)
 
 
 async def test_websocket_connection():
@@ -130,7 +140,7 @@ async def test_websocket_connection():
                 msg3 = await ws.receive_json(timeout=7)
                 updated_xp = msg3['data']['agents']['websocket_demo_agent']['xp']
                 updated_level = msg3['data']['agents']['websocket_demo_agent']['level']
-                print(f"✓ Received live update via WebSocket")
+                print("✓ Received live update via WebSocket")
                 print(f"  Updated XP: {updated_xp}")
                 print(f"  Updated Level: {updated_level}")
                 print()
