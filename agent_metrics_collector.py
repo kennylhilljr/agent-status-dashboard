@@ -24,6 +24,9 @@ Usage:
 """
 
 import contextlib
+import importlib.util
+import logging
+import sys
 import time
 import uuid
 from datetime import UTC, datetime
@@ -32,6 +35,39 @@ from typing import Literal
 
 from metrics import AgentEvent, AgentProfile, DashboardState, SessionSummary
 from metrics_store import MetricsStore
+from strengths_weaknesses import update_agent_strengths_weaknesses
+from xp_calculations import (
+    calculate_level_from_xp,
+    calculate_total_xp_for_success,
+    calculate_xp_for_contribution_type,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _load_achievement_rules():
+    """Load the root ``achievements.py`` under a private module name.
+
+    ``scripts/achievements.py`` (the CLI renderer) shares the module name
+    ``achievements``. Callers that put ``scripts/`` on ``sys.path`` would get the
+    wrong module from a plain import, and a plain import here would shadow theirs.
+
+    Returns:
+        The loaded achievement rules module
+    """
+    name = "_agent_metrics_achievement_rules"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(
+        name, Path(__file__).resolve().parent / "achievements.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+check_all_achievements = _load_achievement_rules().check_all_achievements
 
 # Model pricing (USD per 1000 tokens)
 MODEL_PRICING = {
@@ -40,6 +76,25 @@ MODEL_PRICING = {
     "claude-haiku-4-5": {"input": 0.0008, "output": 0.004},
     "claude-sonnet-3-5": {"input": 0.003, "output": 0.015},
 }
+
+# Pricing used when a model is not in MODEL_PRICING (Sonnet rates)
+DEFAULT_PRICING = {"input": 0.003, "output": 0.015}
+
+# Models already warned about, so an unpriced model logs once per process
+_warned_unpriced_models: set[str] = set()
+
+# Artifact prefix + keyword -> (profile counter, XP contribution type or None)
+_ARTIFACT_RULES: list[tuple[str, str | None, str, str | None]] = [
+    ("commit:", None, "commits_made", "commit"),
+    ("pr:", "created", "prs_created", "pr_created"),
+    ("pr:", "merged", "prs_merged", "pr_merged"),
+    ("file:", "created", "files_created", "file_created"),
+    ("file:", "modified", "files_modified", "file_modified"),
+    ("issue:", "created", "issues_created", "issue_created"),
+    ("issue:", "completed", "issues_completed", "ticket_completed"),
+    ("message:", None, "messages_sent", None),
+    ("review:", None, "reviews_completed", None),
+]
 
 
 class AgentTracker:
@@ -167,11 +222,18 @@ def _calculate_cost(model_used: str, input_tokens: int, output_tokens: int) -> f
     Returns:
         Estimated cost in USD
     """
-    # Default pricing if model not in table
-    pricing = MODEL_PRICING.get(
-        model_used,
-        {"input": 0.003, "output": 0.015}  # Default to Sonnet pricing
-    )
+    pricing = MODEL_PRICING.get(model_used)
+    if pricing is None:
+        # Unknown model: fall back to Sonnet rates, but say so, because the
+        # resulting cost is only an estimate for non-Claude models.
+        if model_used not in _warned_unpriced_models:
+            _warned_unpriced_models.add(model_used)
+            logger.warning(
+                "No pricing for model %r; estimating cost with default Sonnet rates. "
+                "Add it to MODEL_PRICING for accurate cost totals.",
+                model_used,
+            )
+        pricing = DEFAULT_PRICING
 
     # Cost per 1000 tokens
     input_cost = (input_tokens / 1000.0) * pricing["input"]
@@ -230,16 +292,31 @@ def _create_empty_profile(agent_name: str) -> AgentProfile:
     return profile
 
 
-def _update_agent_profile(profile: AgentProfile, event: AgentEvent) -> AgentProfile:
+def _update_agent_profile(
+    profile: AgentProfile,
+    event: AgentEvent,
+    all_events: list[AgentEvent] | None = None,
+) -> AgentProfile:
     """Update an agent profile with a new event.
+
+    Updates counters, derived metrics, streaks, XP, level and achievements.
 
     Args:
         profile: Existing agent profile
         event: New event to incorporate
+        all_events: Full event log (may already include ``event``). Used for
+            achievements that look at history; if None, only ``event`` is used.
 
     Returns:
         Updated agent profile
     """
+    # A previous invocation failed iff there was one and the streak is broken
+    previous_status = (
+        "error"
+        if profile["total_invocations"] > 0 and profile["current_streak"] == 0
+        else "success"
+    )
+
     # Update counters
     profile["total_invocations"] += 1
 
@@ -257,26 +334,15 @@ def _update_agent_profile(profile: AgentProfile, event: AgentEvent) -> AgentProf
     profile["total_cost_usd"] += event["estimated_cost_usd"]
     profile["total_duration_seconds"] += event["duration_seconds"]
 
-    # Update artifact counters based on artifacts
+    # Update artifact counters based on artifacts (first matching rule wins)
+    contribution_xp = 0
     for artifact in event["artifacts"]:
-        if artifact.startswith("commit:"):
-            profile["commits_made"] += 1
-        elif artifact.startswith("pr:") and "created" in artifact:
-            profile["prs_created"] += 1
-        elif artifact.startswith("pr:") and "merged" in artifact:
-            profile["prs_merged"] += 1
-        elif artifact.startswith("file:") and "created" in artifact:
-            profile["files_created"] += 1
-        elif artifact.startswith("file:") and "modified" in artifact:
-            profile["files_modified"] += 1
-        elif artifact.startswith("issue:") and "created" in artifact:
-            profile["issues_created"] += 1
-        elif artifact.startswith("issue:") and "completed" in artifact:
-            profile["issues_completed"] += 1
-        elif artifact.startswith("message:"):
-            profile["messages_sent"] += 1
-        elif artifact.startswith("review:"):
-            profile["reviews_completed"] += 1
+        for prefix, keyword, counter, contribution in _ARTIFACT_RULES:
+            if artifact.startswith(prefix) and (keyword is None or keyword in artifact):
+                profile[counter] += 1
+                if contribution is not None:
+                    contribution_xp += calculate_xp_for_contribution_type(contribution)
+                break
 
     # Update derived metrics
     if profile["total_invocations"] > 0:
@@ -293,6 +359,26 @@ def _update_agent_profile(profile: AgentProfile, event: AgentEvent) -> AgentProf
         profile["recent_events"] = profile["recent_events"][-20:]
 
     profile["last_active"] = event["ended_at"]
+
+    # XP and level (only successful invocations earn XP)
+    if event["status"] == "success":
+        profile["xp"] += calculate_total_xp_for_success(
+            duration_seconds=event["duration_seconds"],
+            current_streak=profile["current_streak"],
+            previous_status=previous_status,
+            contribution_xp=contribution_xp,
+        )
+    profile["level"] = calculate_level_from_xp(profile["xp"])
+
+    # Achievements
+    events = list(all_events) if all_events is not None else []
+    if not any(e["event_id"] == event["event_id"] for e in events):
+        events.append(event)
+    agent_events = [e for e in events if e["agent_name"] == event["agent_name"]]
+    session_events = [e for e in events if e["session_id"] == event["session_id"]]
+    for achievement_id in check_all_achievements(profile, event, agent_events, session_events):
+        if achievement_id not in profile["achievements"]:
+            profile["achievements"].append(achievement_id)
 
     return profile
 
@@ -497,7 +583,10 @@ class AgentMetricsCollector:
                 state["agents"][event["agent_name"]] = _create_empty_profile(event["agent_name"])
 
             profile = state["agents"][event["agent_name"]]
-            state["agents"][event["agent_name"]] = _update_agent_profile(profile, event)
+            state["agents"][event["agent_name"]] = _update_agent_profile(
+                profile, event, state["events"]
+            )
+            update_agent_strengths_weaknesses(state)
 
             # Update global counters
             state["total_tokens"] += event["total_tokens"]
