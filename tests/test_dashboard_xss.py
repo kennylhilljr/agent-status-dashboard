@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 import pytest
-from playwright.async_api import async_playwright
+from playwright.async_api import Browser, Page, Playwright, Route, WebSocketRoute, async_playwright
 
 DASHBOARD_URL = f"file://{(Path(__file__).parent.parent / 'dashboard.html').absolute()}"
 
@@ -55,13 +55,13 @@ def _metrics() -> dict:
     }
 
 
-async def _open(p, *, via_websocket: bool):
+async def _open(p: Playwright, *, via_websocket: bool) -> tuple[Browser, Page, list[str]]:
     browser = await p.chromium.launch(headless=True)
     page = await browser.new_page()
     detail_urls: list[str] = []
     body = json.dumps(_metrics())
 
-    async def handle_api(route):
+    async def handle_api(route: Route) -> None:
         url = route.request.url
         if "/api/metrics" in url and not via_websocket:
             await route.fulfill(status=200, content_type="application/json", body=body)
@@ -71,7 +71,7 @@ async def _open(p, *, via_websocket: bool):
         else:
             await route.abort()
 
-    def handle_ws(ws):
+    def handle_ws(ws: WebSocketRoute) -> None:
         if via_websocket:
             ws.send(json.dumps({"type": "metrics_update", "data": _metrics()}))
 
@@ -81,14 +81,14 @@ async def _open(p, *, via_websocket: bool):
     await page.route("https://cdn.jsdelivr.net/**", lambda route: route.abort())
     page.on("dialog", lambda dialog: dialog.accept())
     await page.goto(DASHBOARD_URL, wait_until="domcontentloaded")
-    await page.wait_for_selector(".task-card[data-agent]", timeout=10000)
+    await page.wait_for_selector("#agent-cards .task-card", timeout=20000)
     await page.wait_for_timeout(300)  # let any injected onerror/onload fire
     return browser, page, detail_urls
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("via_websocket", [False, True], ids=["rest", "websocket"])
-async def test_hostile_agent_and_event_data_is_rendered_as_text(via_websocket):
+async def test_hostile_agent_and_event_data_is_rendered_as_text(via_websocket: bool) -> None:
     async with async_playwright() as p:
         browser, page, _ = await _open(p, via_websocket=via_websocket)
         try:
@@ -109,7 +109,7 @@ async def test_hostile_agent_and_event_data_is_rendered_as_text(via_websocket):
 
 
 @pytest.mark.asyncio
-async def test_clicking_hostile_agent_card_runs_no_script_and_encodes_url():
+async def test_clicking_hostile_agent_card_runs_no_script_and_encodes_url() -> None:
     async with async_playwright() as p:
         browser, page, detail_urls = await _open(p, via_websocket=False)
         try:
