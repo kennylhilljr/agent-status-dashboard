@@ -7,17 +7,17 @@ This script tests that:
 3. All required components work without errors
 """
 
-import json
 import sys
-from pathlib import Path
 from io import StringIO
+from pathlib import Path
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
-from rich.console import Console
 from dashboard import DashboardRenderer, MetricsFileMonitor
 from leaderboard import LeaderboardRenderer
+from rich.console import Console
+
 
 def test_dashboard():
     """Test the dashboard CLI tool."""
@@ -40,7 +40,7 @@ def test_dashboard():
         print("FAIL: Could not load metrics file")
         return False
 
-    print(f"✓ Loaded metrics successfully")
+    print("✓ Loaded metrics successfully")
     print(f"  - Project: {state.get('project_name', 'unknown')}")
     print(f"  - Agents: {len(state.get('agents', {}))}")
     print(f"  - Events: {len(state.get('events', []))}")
@@ -52,19 +52,19 @@ def test_dashboard():
 
     try:
         # Test rendering components
-        header = renderer.create_project_header(state)
+        renderer.create_project_header(state)
         print("✓ Created project header")
 
-        agent_table = renderer.create_agent_status_table(
+        renderer.create_agent_status_table(
             state.get("agents", {}),
             state.get("events", [])
         )
         print("✓ Created agent status table")
 
-        metrics_panel = renderer.create_metrics_panel(state)
+        renderer.create_metrics_panel(state)
         print("✓ Created metrics panel")
 
-        layout = renderer.create_dashboard_layout(state)
+        renderer.create_dashboard_layout(state)
         print("✓ Created complete dashboard layout")
 
         # Verify agents are displayed
@@ -74,7 +74,10 @@ def test_dashboard():
             for agent_name, agent_data in sorted(agents.items()):
                 success_rate = agent_data.get("success_rate", 0.0)
                 invocations = agent_data.get("total_invocations", 0)
-                print(f"  - {agent_name}: {invocations} invocations, {success_rate*100:.1f}% success")
+                print(
+                    f"  - {agent_name}: {invocations} invocations, "
+                    f"{success_rate*100:.1f}% success"
+                )
 
         return True
 
@@ -105,7 +108,7 @@ def test_leaderboard():
         print("FAIL: Could not load metrics file")
         return False
 
-    print(f"✓ Loaded metrics successfully")
+    print("✓ Loaded metrics successfully")
 
     # Test LeaderboardRenderer
     console = Console(file=StringIO(), width=120)
@@ -113,13 +116,13 @@ def test_leaderboard():
 
     try:
         # Test rendering components
-        header = renderer.create_project_header(state)
+        renderer.create_project_header(state)
         print("✓ Created project header")
 
-        leaderboard_table = renderer.create_leaderboard_table(state.get("agents", {}))
+        renderer.create_leaderboard_table(state.get("agents", {}))
         print("✓ Created leaderboard table")
 
-        layout = renderer.create_leaderboard_layout(state)
+        renderer.create_leaderboard_layout(state)
         print("✓ Created complete leaderboard layout")
 
         # Verify agents are sorted by XP
@@ -135,7 +138,10 @@ def test_leaderboard():
                 xp = agent_data.get("xp", 0)
                 level = agent_data.get("level", 1)
                 success_rate = agent_data.get("success_rate", 0.0)
-                print(f"  #{rank} {agent_name}: Level {level}, {xp} XP, {success_rate*100:.1f}% success")
+                print(
+                    f"  #{rank} {agent_name}: Level {level}, {xp} XP, "
+                    f"{success_rate*100:.1f}% success"
+                )
 
         return True
 
@@ -163,7 +169,7 @@ def test_cli_scripts_exist():
     print(f"✓ Leaderboard script exists: {leaderboard_path}")
 
     # Check if scripts have proper shebang
-    with open(dashboard_path, 'r') as f:
+    with open(dashboard_path) as f:
         first_line = f.readline()
         if first_line.startswith("#!/usr/bin/env python3"):
             print("✓ Dashboard has correct shebang")
@@ -171,7 +177,7 @@ def test_cli_scripts_exist():
             print("FAIL: Dashboard missing proper shebang")
             return False
 
-    with open(leaderboard_path, 'r') as f:
+    with open(leaderboard_path) as f:
         first_line = f.readline()
         if first_line.startswith("#!/usr/bin/env python3"):
             print("✓ Leaderboard has correct shebang")

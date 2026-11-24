@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Run metrics persistence tests with coverage."""
 
+import json
 import subprocess
 import sys
-import json
+from pathlib import Path
+
+REPO_DIR = Path(__file__).resolve().parent
 
 # Run pytest with coverage
 result = subprocess.run(
@@ -18,7 +21,7 @@ result = subprocess.run(
     ],
     capture_output=True,
     text=True,
-    cwd="/Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard"
+    cwd=REPO_DIR,
 )
 
 print(result.stdout)
@@ -26,12 +29,14 @@ print(result.stderr)
 
 # Try to parse coverage JSON
 try:
-    with open("/Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-status-dashboard/coverage.json") as f:
+    with open(REPO_DIR / "coverage.json") as f:
         coverage_data = json.load(f)
         print("\n\n=== COVERAGE SUMMARY ===")
         if "totals" in coverage_data:
             totals = coverage_data["totals"]
-            print(f"Lines covered: {totals.get('num_statements', 0)} / {totals.get('num_statements', 0)}")
+            covered = totals.get("covered_lines", 0)
+            statements = totals.get("num_statements", 0)
+            print(f"Lines covered: {covered} / {statements}")
             print(f"Coverage percentage: {totals.get('percent_covered', 0):.1f}%")
 except Exception as e:
     print(f"Could not parse coverage: {e}")

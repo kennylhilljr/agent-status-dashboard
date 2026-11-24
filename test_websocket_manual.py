@@ -8,14 +8,24 @@ This script:
 5. Validates live updates
 """
 
-import asyncio
 import subprocess
 import time
-from pathlib import Path
-from playwright.sync_api import sync_playwright
-from metrics_store import MetricsStore
-from metrics import DashboardState, AgentProfile, AgentEvent
 from datetime import datetime
+from pathlib import Path
+
+import pytest
+from playwright.sync_api import sync_playwright
+
+from metrics import AgentProfile, DashboardState
+from metrics_store import MetricsStore
+
+# Manual demonstration, not a unit test: it starts dashboard_server.py on port 8080,
+# writes metrics into the working directory and drives a headed browser.
+# Run it directly with `python test_websocket_manual.py`.
+pytestmark = pytest.mark.skip(
+    reason="manual script: starts a local server and needs a headed browser; "
+    "run it directly with python"
+)
 
 
 def create_test_metrics():
