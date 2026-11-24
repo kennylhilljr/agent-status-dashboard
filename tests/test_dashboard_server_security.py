@@ -51,9 +51,13 @@ async def test_ws_rejects_foreign_origin(tmp_path):
 async def test_ws_accepts_allowed_and_loopback_origins(tmp_path):
     client = await _client(tmp_path)
     try:
+        # The real listening port is used, not the configured one.
+        port = client.server.port
         assert await _ws_status(client, {'Origin': 'http://localhost:3000'}) == 101
-        assert await _ws_status(client, {'Origin': f'http://127.0.0.1:{PORT}'}) == 101
-        assert await _ws_status(client, {'Origin': f'http://[::1]:{PORT}'}) == 101
+        assert await _ws_status(client, {'Origin': f'http://127.0.0.1:{port}'}) == 101
+        assert await _ws_status(client, {'Origin': f'http://127.0.0.2:{port}'}) == 101
+        assert await _ws_status(client, {'Origin': f'http://[::1]:{port}'}) == 101
+        assert await _ws_status(client, {'Origin': f'http://localhost:{port}'}) == 101
         # Non-browser clients send no Origin.
         assert await _ws_status(client, {}) == 101
     finally:
@@ -117,6 +121,9 @@ async def test_token_required_on_api_and_ws(tmp_path):
         good = {'Authorization': f'Bearer {TOKEN}'}
         assert (await client.get('/api/metrics', headers=good)).status == 200
         assert await _ws_status(client, good) == 101
+        # Subprotocol form only counts for /ws.
+        proto = {'Sec-WebSocket-Protocol': f'bearer.{TOKEN}'}
+        assert (await client.get('/api/metrics', headers=proto)).status == 401
         # Health stays open; preflight carries no credentials.
         assert (await client.get('/health')).status == 200
         assert (await client.options('/api/metrics')).status == 204
@@ -133,6 +140,25 @@ async def test_token_from_env(tmp_path, monkeypatch):
         assert (await client.get('/api/metrics', headers=good)).status == 200
     finally:
         await client.close()
+
+
+async def test_ws_token_as_subprotocol(tmp_path):
+    """Browsers cannot set headers on a WebSocket, so the token rides as a subprotocol."""
+    client = await _client(tmp_path, auth_token=TOKEN)
+    try:
+        ws = await client.ws_connect('/ws', protocols=('bearer', f'bearer.{TOKEN}'))
+        assert ws.protocol == 'bearer'
+        await ws.close()
+        with pytest.raises(aiohttp.WSServerHandshakeError) as exc:
+            await client.ws_connect('/ws', protocols=('bearer', 'bearer.wrong'))
+        assert exc.value.status == 401
+    finally:
+        await client.close()
+
+
+def test_ipv6_loopback_brackets_are_stripped_for_binding(tmp_path):
+    server = DashboardServer(metrics_dir=tmp_path, host='[::1]')
+    assert server.host == '::1'
 
 
 def test_non_loopback_host_requires_token(tmp_path):
@@ -153,5 +179,19 @@ def test_non_loopback_hosts(host):
 
 def test_origin_allowed_is_case_and_slash_insensitive():
     assert is_origin_allowed('HTTP://LOCALHOST:3000')
+    assert is_origin_allowed('http://localhost:3000/')
     assert not is_origin_allowed('')
     assert not is_origin_allowed('http://localhost:3000.evil.example')
+
+
+@pytest.mark.parametrize('origin', [
+    'null',
+    'http://localhost:3000/path',
+    'http://localhost:3000?x=1',
+    'http://user@localhost:3000',
+    'ftp://localhost:3000',
+    'http://localhost:notaport',
+    'http://evil.example:8890',
+])
+def test_malformed_or_foreign_origins_rejected(origin):
+    assert not is_origin_allowed(origin, PORT)

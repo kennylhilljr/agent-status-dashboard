@@ -29,7 +29,11 @@ WebSocket Origin check:
 
 Authentication:
     - Set DASHBOARD_API_TOKEN to require "Authorization: Bearer <token>" on
-      /api/* and /ws (/health stays open)
+      /api/* and /ws (/health stays open). Use a long random value made of
+      letters, digits, '-', '_' and '.' (e.g. python -c "import secrets;
+      print(secrets.token_urlsafe(32))")
+    - Browsers cannot set headers on a WebSocket, so /ws also accepts the token
+      as a subprotocol: new WebSocket(url, ['bearer', 'bearer.' + token])
     - On a loopback host (127.0.0.1, localhost, ::1) the token is optional, so
       local use needs no setup
     - On any other host (e.g. --host 0.0.0.0) the server refuses to start
@@ -151,12 +155,28 @@ def is_loopback_host(host: str) -> bool:
         return False
 
 
-def _loopback_origins(port: int | None) -> set[str]:
-    """Browser origins of pages served from loopback on the given port."""
+def _normalize_origin(origin: str) -> str | None:
+    """Return scheme://host[:port] in lower case, or None if not a plain origin."""
+    try:
+        parts = urlsplit(origin.strip())
+        if parts.scheme not in ('http', 'https') or not parts.hostname:
+            return None
+        if parts.path not in ('', '/') or parts.query or parts.fragment:
+            return None
+        if parts.username or parts.password:
+            return None
+        _ = parts.port  # raises ValueError on a malformed port
+    except ValueError:
+        return None
+    return f'{parts.scheme}://{parts.netloc}'.lower()
+
+
+def _is_loopback_origin(normalized: str, port: int | None) -> bool:
+    """True for http(s) origins on a loopback host and this server's port."""
     if port is None:
-        return set()
-    hosts = ('localhost', '127.0.0.1', '[::1]')
-    return {f'http://{h}:{port}' for h in hosts}
+        return False
+    parts = urlsplit(normalized)
+    return parts.port == port and is_loopback_host(parts.hostname or '')
 
 
 def is_origin_allowed(origin: str, port: int | None = None) -> bool:
@@ -168,25 +188,24 @@ def is_origin_allowed(origin: str, port: int | None = None) -> bool:
 
     Returns:
         True if CORS_ALLOWED_ORIGINS is '*', lists this origin, or the origin is
-        a loopback origin on the server's own port.
+        a loopback origin (localhost, 127.0.0.0/8, [::1]) on the server's port.
     """
     allowed = get_allowed_origin_list()
     if '*' in allowed:
         return True
-    if not origin:
+    normalized = _normalize_origin(origin or '')
+    if normalized is None:
         return False
-    try:
-        parts = urlsplit(origin)
-        normalized = f'{parts.scheme}://{parts.netloc}'.lower()
-    except ValueError:
-        return False
-    if normalized in {o.lower().rstrip('/') for o in allowed}:
+    if normalized in {_normalize_origin(o) for o in allowed}:
         return True
-    return normalized in _loopback_origins(port)
+    return _is_loopback_origin(normalized, port)
 
 
 def _request_port(request: Request) -> int | None:
-    """Port this server is listening on, as recorded in the app."""
+    """Port of the socket this request arrived on (handles port=0 and embedding)."""
+    sockname = request.transport.get_extra_info('sockname') if request.transport else None
+    if isinstance(sockname, tuple) and len(sockname) >= 2:
+        return sockname[1]
     return request.app.get(PORT_KEY)
 
 
@@ -224,6 +243,22 @@ def _is_protected_path(path: str) -> bool:
     return path == '/ws' or path.startswith('/api/') or path == '/api'
 
 
+def _has_valid_token(request: Request, token: str) -> bool:
+    """Check the Authorization header, or for /ws the 'bearer.<token>' subprotocol."""
+    expected = token.encode()
+    scheme, _, supplied = request.headers.get('Authorization', '').partition(' ')
+    if scheme.lower() == 'bearer' and hmac.compare_digest(supplied.strip().encode(), expected):
+        return True
+    if request.path == '/ws':
+        offered = request.headers.get('Sec-WebSocket-Protocol', '')
+        for proto in (p.strip() for p in offered.split(',')):
+            if proto.startswith('bearer.') and hmac.compare_digest(
+                proto[len('bearer.'):].encode(), expected
+            ):
+                return True
+    return False
+
+
 @middleware
 async def auth_middleware(request: Request, handler):
     """Require the configured bearer token on /api/* and /ws.
@@ -235,11 +270,7 @@ async def auth_middleware(request: Request, handler):
     if not token or request.method == 'OPTIONS' or not _is_protected_path(request.path):
         return await handler(request)
 
-    header = request.headers.get('Authorization', '')
-    scheme, _, supplied = header.partition(' ')
-    if scheme.lower() == 'bearer' and hmac.compare_digest(
-        supplied.strip().encode(), token.encode()
-    ):
+    if _has_valid_token(request, token):
         return await handler(request)
 
     return web.json_response(
@@ -307,12 +338,13 @@ class DashboardServer:
         self.project_name = project_name
         self.metrics_dir = metrics_dir or Path.cwd()
         self.port = port
-        self.host = host
+        # aiohttp binds IPv6 literals without brackets.
+        self.host = host.strip().strip('[]') if host.strip().startswith('[') else host
         if auth_token is None:
             auth_token = os.getenv(AUTH_TOKEN_ENV, '')
         self.auth_token = auth_token.strip()
 
-        if not self.auth_token and not is_loopback_host(host):
+        if not self.auth_token and not is_loopback_host(self.host):
             raise ValueError(
                 f"Refusing to bind to non-loopback host {host!r} without authentication. "
                 f"Set {AUTH_TOKEN_ENV} to a long random value; clients must then send "
@@ -521,14 +553,15 @@ class DashboardServer:
             403: If the Origin header is present and not allowed
         """
         origin = request.headers.get('Origin')
-        if origin is not None and not is_origin_allowed(origin, self.port):
+        if origin is not None and not is_origin_allowed(origin, _request_port(request)):
             logger.warning(f"Rejected WebSocket handshake from origin {origin!r}")
             raise web.HTTPForbidden(
                 text=json.dumps({'error': 'Origin not allowed'}),
                 content_type='application/json',
             )
 
-        ws = WebSocketResponse()
+        # Echo 'bearer' when a browser sent its token as a subprotocol.
+        ws = WebSocketResponse(protocols=('bearer',))
         await ws.prepare(request)
 
         # Add to active connections

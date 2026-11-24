@@ -258,7 +258,7 @@ class TestDashboardServer(AioHTTPTestCase):
     @unittest_run_loop
     async def test_cors_loopback_origin_on_own_port_allowed(self):
         """A page served from loopback on the server's own port is allowed."""
-        origin = 'http://127.0.0.1:8888'
+        origin = f'http://127.0.0.1:{self.client.server.port}'
         resp = await self.client.request('GET', '/api/metrics', headers={'Origin': origin})
         assert resp.headers['Access-Control-Allow-Origin'] == origin
 
