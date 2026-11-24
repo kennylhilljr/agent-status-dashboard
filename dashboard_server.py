@@ -443,12 +443,19 @@ class DashboardServer:
         """
         signature = await asyncio.to_thread(self._metrics_signature)
         cache = self._broadcast_cache
-        if cache is not None and signature is not None and cache[0] == signature:
+        if cache is not None and cache[0] == signature:
             return cache[1]
 
         state = await self._load_state()
         data = json.dumps(state)
-        self._broadcast_cache = (signature, data)
+        # load() returns a fresh empty state when it cannot get the file lock.
+        # Caching that under the real file's signature would keep serving empty
+        # metrics until the file next changes, so only non-empty states are
+        # cached. An empty state is cheap to reload on the next tick.
+        if state.get('events') or state.get('sessions') or state.get('agents'):
+            self._broadcast_cache = (signature, data)
+        else:
+            self._broadcast_cache = None
         return data
 
     @staticmethod

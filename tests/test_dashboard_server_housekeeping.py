@@ -25,11 +25,18 @@ from dashboard_server import DashboardServer
 SECRET = "/very/private/path/.agent_metrics.lock"
 
 
+def _seed_state(store):
+    """Save a state with one agent, so it is not an empty state."""
+    state = store.load()
+    state["agents"]["seed_agent"] = {"agent_name": "seed_agent"}
+    store.save(state)
+
+
 @pytest.fixture
 def server(tmp_path):
-    """DashboardServer backed by a temporary metrics directory."""
+    """DashboardServer backed by a temporary, non-empty metrics file."""
     srv = DashboardServer(project_name="housekeeping", metrics_dir=tmp_path, port=0)
-    srv.store.save(srv.store.load())
+    _seed_state(srv.store)
     return srv
 
 
@@ -111,6 +118,21 @@ async def test_broadcast_rereads_only_when_file_changes(server, monkeypatch):
     changed = await server._serialized_state()
     assert calls == 2
     assert json.loads(changed)["total_sessions"] == 42
+
+
+async def test_lock_timeout_fallback_is_not_cached(server, monkeypatch):
+    real_load = server.store.load
+    real = await server._serialized_state()
+    server._broadcast_cache = None
+
+    # On lock timeout, load() returns a fresh empty state instead of the file.
+    monkeypatch.setattr(server.store, "load", server.store._create_empty_state)
+    empty = json.loads(await server._serialized_state())
+    assert empty["agents"] == {}
+
+    # Once the lock is free again, the unchanged file must be re-read.
+    monkeypatch.setattr(server.store, "load", real_load)
+    assert await server._serialized_state() == real
 
 
 async def test_broadcast_message_is_valid_json(server):
