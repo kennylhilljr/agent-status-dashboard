@@ -35,7 +35,12 @@ from typing import Literal
 
 from metrics import AgentEvent, AgentProfile, DashboardState, SessionSummary
 from metrics_store import MetricsStore
-from strengths_weaknesses import update_agent_strengths_weaknesses
+from strengths_weaknesses import (
+    calculate_agent_percentiles,
+    calculate_rolling_window_stats,
+    detect_strengths,
+    detect_weaknesses,
+)
 from xp_calculations import (
     calculate_level_from_xp,
     calculate_total_xp_for_success,
@@ -306,6 +311,9 @@ def _update_agent_profile(
         event: New event to incorporate
         all_events: Full event log (may already include ``event``). Used for
             achievements that look at history; if None, only ``event`` is used.
+            The store caps this log, so history-based achievements only see
+            retained events (they can be missed for sparse agents, never
+            awarded wrongly from missing data).
 
     Returns:
         Updated agent profile
@@ -381,6 +389,29 @@ def _update_agent_profile(
             profile["achievements"].append(achievement_id)
 
     return profile
+
+
+def _refresh_strengths_weaknesses(
+    state: DashboardState, window_size: int = 20, min_events: int = 5
+) -> None:
+    """Recompute strengths and weaknesses for every agent, in place.
+
+    Percentiles are relative across agents, so all profiles are refreshed. An
+    agent with fewer than ``min_events`` events still in the (capped) event log
+    keeps its previous values instead of being cleared because its history aged out.
+
+    Args:
+        state: Dashboard state to update
+        window_size: Size of the rolling window per agent
+        min_events: Minimum retained events needed to re-detect
+    """
+    percentiles = calculate_agent_percentiles(state, window_size)
+    for agent_name, profile in state["agents"].items():
+        stats = calculate_rolling_window_stats(state["events"], agent_name, window_size)
+        if stats["event_count"] < min_events:
+            continue
+        profile["strengths"] = detect_strengths(agent_name, stats, percentiles, min_events)
+        profile["weaknesses"] = detect_weaknesses(agent_name, stats, percentiles, min_events)
 
 
 class AgentMetricsCollector:
@@ -586,7 +617,7 @@ class AgentMetricsCollector:
             state["agents"][event["agent_name"]] = _update_agent_profile(
                 profile, event, state["events"]
             )
-            update_agent_strengths_weaknesses(state)
+            _refresh_strengths_weaknesses(state)
 
             # Update global counters
             state["total_tokens"] += event["total_tokens"]

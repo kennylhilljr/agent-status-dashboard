@@ -91,6 +91,22 @@ def test_strengths_and_weaknesses_are_populated(collector):
     assert "high_success_rate" in profile["strengths"]
 
 
+def test_strengths_survive_when_agent_history_ages_out(collector):
+    for i in range(6):
+        with collector.track_agent("coding", f"AI-{i}", "claude-sonnet-4-5"):
+            pass
+    assert collector.get_state()["agents"]["coding"]["strengths"]
+
+    # Push coding's events out of the capped event log with another agent
+    state = collector.get_state()
+    state["events"] = [e for e in state["events"] if e["agent_name"] != "coding"]
+    collector.store.save(state)
+    with collector.track_agent("linear", "AI-99", "claude-haiku-4-5"):
+        pass
+
+    assert "high_success_rate" in collector.get_state()["agents"]["coding"]["strengths"]
+
+
 def test_unknown_model_logs_warning_once(caplog, monkeypatch):
     monkeypatch.setattr(agent_metrics_collector, "_warned_unpriced_models", set())
     with caplog.at_level(logging.WARNING, logger="agent_metrics_collector"):
