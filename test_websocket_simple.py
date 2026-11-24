@@ -14,7 +14,8 @@ from metrics_store import MetricsStore
 # and writes metrics into the working directory. tests/test_websocket.py covers the
 # WebSocket endpoint. Run this directly with `python test_websocket_simple.py`.
 pytestmark = pytest.mark.skip(
-    reason="manual script: starts a local server on port 8080; run it directly with python"
+    reason="manual script: starts a local server on port 8080 and writes metrics to the "
+    "working directory; run it directly with python"
 )
 
 

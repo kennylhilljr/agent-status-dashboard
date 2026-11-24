@@ -23,8 +23,8 @@ from metrics_store import MetricsStore
 # writes metrics into the working directory and drives a headed browser.
 # Run it directly with `python test_websocket_manual.py`.
 pytestmark = pytest.mark.skip(
-    reason="manual script: starts a local server and needs a headed browser; "
-    "run it directly with python"
+    reason="manual script: starts a local server, writes metrics to the working directory "
+    "and needs a headed browser; run it directly with python"
 )
 
 

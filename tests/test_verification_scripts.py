@@ -76,4 +76,6 @@ def test_manual_websocket_scripts_are_skipped_by_pytest(module_name):
     marks = marks if isinstance(marks, list) else [marks]
     skips = [mark for mark in marks if mark.name == "skip"]
     assert skips, f"{module_name} must be skipped under default pytest"
-    assert "manual" in skips[0].kwargs["reason"]
+    reason = skips[0].kwargs["reason"]
+    assert "manual" in reason
+    assert "writes metrics" in reason
