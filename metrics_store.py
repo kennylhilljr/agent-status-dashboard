@@ -4,7 +4,10 @@ This module provides the MetricsStore class which handles:
 - Loading/saving DashboardState to/from .agent_metrics.json
 - Atomic writes using write-then-rename pattern (write to temp file, then rename)
 - FIFO eviction: keep last 500 events, last 50 sessions
-- Corruption recovery: if JSON is invalid, restore from .bak file or create fresh state
+- Corruption recovery: if JSON is invalid, restore from .bak file; if both are
+  invalid, move them aside (*.corrupt-<timestamp>) and start fresh
+- update(fn): read-modify-write under a single lock so concurrent writers
+  cannot lose updates
 - Cross-process safe operations using fcntl file locking
 
 The MetricsStore integrates with the TypedDict types from metrics.py and provides
@@ -18,10 +21,14 @@ import os
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import TypeVar
 
 from metrics import DashboardState
+
+T = TypeVar("T")
 
 
 class LockAcquisitionError(Exception):
@@ -92,9 +99,12 @@ class MetricsStore:
 
     Usage:
         store = MetricsStore(project_name="my-project")
-        state = store.load()
-        state["total_sessions"] += 1
-        store.save(state)
+        state = store.load()  # read-only use
+
+        def bump(state):
+            state["total_sessions"] += 1
+
+        store.update(bump)  # read-modify-write under one lock
     """
 
     # FIFO limits
@@ -198,58 +208,116 @@ class MetricsStore:
 
         return True
 
+    def _read_state_file(self, path: Path) -> dict | None:
+        """Read and validate a state file.
+
+        Returns:
+            The parsed state, or None if the file is not valid JSON or does not
+            have the DashboardState structure.
+
+        Raises:
+            OSError: If the file exists but cannot be read (for example a
+                permissions error). Callers must not treat this as "no data".
+        """
+        try:
+            with open(path, encoding='utf-8') as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+        if isinstance(data, dict) and self._validate_state(data):
+            return data
+        return None
+
+    def _quarantine(self, path: Path) -> Path:
+        """Move a corrupted file aside so it is never overwritten.
+
+        Returns:
+            The path the file was moved to.
+        """
+        stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
+        target = path.with_name(f"{path.name}.corrupt-{stamp}")
+        os.replace(path, target)
+        return target
+
+    def _load_locked(self) -> DashboardState:
+        """Load state from disk. Caller must hold both locks.
+
+        Returns an empty state only when no metrics file exists. If the main
+        file is corrupted, it is restored from the backup. If both are
+        corrupted, they are moved aside (``*.corrupt-<timestamp>``) before a
+        fresh state is returned, so a later save() cannot destroy them.
+
+        Raises:
+            OSError: If a metrics file exists but cannot be read.
+        """
+        if not self.metrics_path.exists():
+            return self._create_empty_state()
+
+        data = self._read_state_file(self.metrics_path)
+        if data is not None:
+            return data  # type: ignore
+
+        # Main file is corrupted, try backup
+        if self.backup_path.exists():
+            backup = self._read_state_file(self.backup_path)
+            if backup is not None:
+                # Keep the corrupted main file for inspection, then restore
+                self._quarantine(self.metrics_path)
+                self._atomic_write(self.metrics_path, backup)
+                return backup  # type: ignore
+            self._quarantine(self.backup_path)
+
+        # Both unusable: preserve the corrupted file, start fresh
+        self._quarantine(self.metrics_path)
+        return self._create_empty_state()
+
+    def _save_locked(self, state: DashboardState) -> None:
+        """Validate, evict and atomically write state. Caller must hold both locks."""
+        if not self._validate_state(state):
+            raise ValueError("Invalid DashboardState structure - cannot save")
+
+        state["updated_at"] = datetime.utcnow().isoformat() + "Z"
+        state = self._apply_fifo_eviction(state)
+
+        # Create atomic backup of existing file before overwriting
+        if self.metrics_path.exists():
+            self._atomic_backup(self.metrics_path, self.backup_path)
+
+        self._atomic_write(self.metrics_path, state)
+
     def load(self) -> DashboardState:
         """Load DashboardState from disk with corruption recovery.
 
-        Attempts to load from .agent_metrics.json. If the file is corrupted:
-        1. Try to restore from .agent_metrics.json.bak
-        2. If backup is also corrupted, create a fresh empty state
-        3. All recovery operations use atomic writes
+        Returns an empty state only when no metrics file exists (corrupted
+        files are restored from backup or moved aside first; see
+        _load_locked).
 
-        Returns:
-            DashboardState loaded from disk or freshly created
+        Raises:
+            LockAcquisitionError: If the file lock cannot be acquired. This is
+                deliberately not turned into an empty state, because callers
+                that save the result would overwrite the real file.
+            OSError: If a metrics file exists but cannot be read.
         """
         with self._thread_lock:
             with _file_lock(self.lock_path, self.LOCK_TIMEOUT):
-                try:
-                    # Try to load main file
-                    if self.metrics_path.exists():
-                        try:
-                            with open(self.metrics_path, encoding='utf-8') as f:
-                                data = json.load(f)
+                return self._load_locked()
 
-                            # Validate structure
-                            if self._validate_state(data):
-                                return data  # type: ignore
-                            else:
-                                # Structure invalid, try backup
-                                raise ValueError("Invalid state structure")
+    def update(self, fn: Callable[[DashboardState], T]) -> T:
+        """Atomically load, mutate and save state under one lock.
 
-                        except (json.JSONDecodeError, ValueError):
-                            # Main file is corrupted, try backup
-                            if self.backup_path.exists():
-                                try:
-                                    with open(self.backup_path, encoding='utf-8') as f:
-                                        data = json.load(f)
+        ``fn`` receives the current state and mutates it in place. Its return
+        value is returned from update(). Use this instead of load() + save()
+        for read-modify-write, so concurrent writers cannot lose updates.
 
-                                    if self._validate_state(data):
-                                        # Successfully recovered from backup
-                                        # Atomically save it back to main file
-                                        self._atomic_write(self.metrics_path, data)
-                                        return data  # type: ignore
-                                except (json.JSONDecodeError, ValueError):
-                                    pass  # Backup also corrupted
-
-                            # Both files corrupted or backup doesn't exist
-                            # Create fresh state
-                            pass
-
-                    # No file exists or all recovery attempts failed - create fresh state
-                    return self._create_empty_state()
-
-                except LockAcquisitionError:
-                    # If we can't get the lock, return empty state rather than failing
-                    return self._create_empty_state()
+        Raises:
+            LockAcquisitionError: If the file lock cannot be acquired.
+        """
+        with self._thread_lock:
+            with _file_lock(self.lock_path, self.LOCK_TIMEOUT):
+                state = self._load_locked()
+                result = fn(state)
+                self._save_locked(state)
+                return result
 
     def _atomic_write(self, target_path: Path, data: dict) -> None:
         """Atomically write data to target file using temp file + rename.
@@ -340,22 +408,7 @@ class MetricsStore:
         """
         with self._thread_lock:
             with _file_lock(self.lock_path, self.LOCK_TIMEOUT):
-                # Validate state structure before writing
-                if not self._validate_state(state):
-                    raise ValueError("Invalid DashboardState structure - cannot save")
-
-                # Update timestamp
-                state["updated_at"] = datetime.utcnow().isoformat() + "Z"
-
-                # Apply FIFO eviction
-                state = self._apply_fifo_eviction(state)
-
-                # Create atomic backup of existing file before overwriting
-                if self.metrics_path.exists():
-                    self._atomic_backup(self.metrics_path, self.backup_path)
-
-                # Atomically write main file
-                self._atomic_write(self.metrics_path, state)
+                self._save_locked(state)
 
     def get_stats(self) -> dict:
         """Get storage statistics.

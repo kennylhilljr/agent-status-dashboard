@@ -344,7 +344,8 @@ class AgentMetricsCollector:
         session_id = str(uuid.uuid4())
         started_at = datetime.utcnow().isoformat() + "Z"
 
-        # Load current state to get session number
+        # Provisional session number; end_session() assigns the final one
+        # under the store lock so concurrent collectors cannot collide.
         state = self.store.load()
         session_number = state["total_sessions"] + 1
 
@@ -395,11 +396,14 @@ class AgentMetricsCollector:
             "tickets_worked": list(session_info["tickets_worked"]),
         }
 
-        # Load state, add session, save
-        state = self.store.load()
-        state["sessions"].append(session_summary)
-        state["total_sessions"] += 1
-        self.store.save(state)
+        # Add session under one lock. The session number is assigned here,
+        # from the persisted counter, so concurrent collectors cannot collide.
+        def add_session(state: DashboardState) -> None:
+            session_summary["session_number"] = state["total_sessions"] + 1
+            state["sessions"].append(session_summary)
+            state["total_sessions"] += 1
+
+        self.store.update(add_session)
 
         # Remove from active sessions
         del self._active_sessions[session_id]
@@ -485,23 +489,25 @@ class AgentMetricsCollector:
             event: Event to record
             session_id: Session ID for this event
         """
-        # Load current state
-        state = self.store.load()
+        def apply_event(state: DashboardState) -> None:
+            state["events"].append(event)
 
-        # Add event to log
-        state["events"].append(event)
+            # Update or create agent profile
+            if event["agent_name"] not in state["agents"]:
+                state["agents"][event["agent_name"]] = _create_empty_profile(event["agent_name"])
 
-        # Update or create agent profile
-        if event["agent_name"] not in state["agents"]:
-            state["agents"][event["agent_name"]] = _create_empty_profile(event["agent_name"])
+            profile = state["agents"][event["agent_name"]]
+            state["agents"][event["agent_name"]] = _update_agent_profile(profile, event)
 
-        profile = state["agents"][event["agent_name"]]
-        state["agents"][event["agent_name"]] = _update_agent_profile(profile, event)
+            # Update global counters
+            state["total_tokens"] += event["total_tokens"]
+            state["total_cost_usd"] += event["estimated_cost_usd"]
+            state["total_duration_seconds"] += event["duration_seconds"]
 
-        # Update global counters
-        state["total_tokens"] += event["total_tokens"]
-        state["total_cost_usd"] += event["estimated_cost_usd"]
-        state["total_duration_seconds"] += event["duration_seconds"]
+        # Load, mutate and save under one lock so concurrent writers don't
+        # lose events, and a lock timeout raises instead of saving an
+        # empty state over the real file.
+        self.store.update(apply_event)
 
         # Update active session tracking
         if session_id in self._active_sessions:
@@ -511,9 +517,6 @@ class AgentMetricsCollector:
             session_info["tickets_worked"].add(event["ticket_key"])
             session_info["total_tokens"] += event["total_tokens"]
             session_info["total_cost_usd"] += event["estimated_cost_usd"]
-
-        # Save state
-        self.store.save(state)
 
     def get_state(self) -> DashboardState:
         """Get the current dashboard state.

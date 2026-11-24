@@ -43,4 +43,5 @@ verification_files/
 
 # MCP and tools
 .playwright-mcp/
-.claude/
+.claude/.agent_metrics.json.corrupt-*
+.agent_metrics.json.bak.corrupt-*
