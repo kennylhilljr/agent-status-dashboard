@@ -107,6 +107,23 @@ def test_strengths_survive_when_agent_history_ages_out(collector):
     assert "high_success_rate" in collector.get_state()["agents"]["coding"]["strengths"]
 
 
+def test_strengths_kept_when_eviction_drops_agent_below_minimum(collector, monkeypatch):
+    for i in range(5):
+        with collector.track_agent("coding", f"AI-{i}", "claude-sonnet-4-5"):
+            pass
+    strengths = collector.get_state()["agents"]["coding"]["strengths"]
+    assert strengths
+
+    # With a 5-event cap, the next event evicts one of coding's five events.
+    monkeypatch.setattr(collector.store, "MAX_EVENTS", 5)
+    with collector.track_agent("linear", "AI-99", "claude-haiku-4-5"):
+        pass
+
+    state = collector.get_state()
+    assert len(state["events"]) == 5
+    assert state["agents"]["coding"]["strengths"] == strengths
+
+
 def test_unknown_model_logs_warning_once(caplog, monkeypatch):
     monkeypatch.setattr(agent_metrics_collector, "_warned_unpriced_models", set())
     with caplog.at_level(logging.WARNING, logger="agent_metrics_collector"):

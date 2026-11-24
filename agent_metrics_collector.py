@@ -617,6 +617,10 @@ class AgentMetricsCollector:
             state["agents"][event["agent_name"]] = _update_agent_profile(
                 profile, event, state["events"]
             )
+            # Apply the store's event cap first so strengths are computed from the
+            # same history that will be persisted.
+            if len(state["events"]) > self.store.MAX_EVENTS:
+                state["events"] = state["events"][-self.store.MAX_EVENTS :]
             _refresh_strengths_weaknesses(state)
 
             # Update global counters
