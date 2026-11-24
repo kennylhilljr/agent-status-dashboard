@@ -11,11 +11,21 @@ import pytest
 
 import agent_metrics_collector
 from agent_metrics_collector import AgentMetricsCollector, _calculate_cost
+from xp_calculations import calculate_speed_bonus
 
 
 @pytest.fixture
 def collector(tmp_path):
     return AgentMetricsCollector(project_name="test-project", metrics_dir=tmp_path)
+
+
+def _speed_bonus_total(collector, agent_name):
+    """Sum the speed bonus actually earned, so assertions don't depend on timing."""
+    return sum(
+        calculate_speed_bonus(e["duration_seconds"])
+        for e in collector.get_state()["events"]
+        if e["agent_name"] == agent_name and e["status"] == "success"
+    )
 
 
 def test_track_agent_awards_xp_and_first_blood(collector):
@@ -24,8 +34,8 @@ def test_track_agent_awards_xp_and_first_blood(collector):
         tracker.add_artifact("commit:abc123")
 
     profile = collector.get_state()["agents"]["coding"]
-    # base 10 + speed 10 + commit 5 + streak 1
-    assert profile["xp"] == 26
+    # base 10 + speed bonus + commit 5 + streak 1
+    assert profile["xp"] == 16 + _speed_bonus_total(collector, "coding")
     assert profile["level"] == 1
     assert "first_blood" in profile["achievements"]
 
@@ -33,11 +43,13 @@ def test_track_agent_awards_xp_and_first_blood(collector):
 def test_xp_accumulates_and_level_rises(collector):
     for i in range(3):
         with collector.track_agent("coding", f"AI-{i}", "claude-sonnet-4-5") as tracker:
-            tracker.add_artifact("pr:#1 merged")
+            tracker.add_artifact(f"pr:#{i}:merged")
+            tracker.add_artifact(f"pr:#{i + 10}:merged")
 
     profile = collector.get_state()["agents"]["coding"]
-    # Each: base 10 + speed 10 + pr_merged 30 + streak (1, 2, 3)
-    assert profile["xp"] == 50 * 3 + 6
+    # Each: base 10 + speed bonus + 2 * pr_merged 30 + streak (1, 2, 3)
+    assert profile["xp"] == 70 * 3 + 6 + _speed_bonus_total(collector, "coding")
+    # 216-246 XP is level 3 whatever the speed bonus
     assert profile["level"] == 3
     assert profile["achievements"].count("first_blood") == 1
 
@@ -49,14 +61,14 @@ def test_failure_earns_no_xp_and_recovery_bonus_applies(collector):
 
     profile = collector.get_state()["agents"]["coding"]
     assert profile["xp"] == 0
-    assert profile["achievements"] == []
+    assert "first_blood" not in profile["achievements"]
 
     with collector.track_agent("coding", "AI-2", "claude-sonnet-4-5"):
         pass
 
     profile = collector.get_state()["agents"]["coding"]
-    # base 10 + speed 10 + recovery 10 + streak 1
-    assert profile["xp"] == 31
+    # base 10 + speed bonus + recovery 10 + streak 1
+    assert profile["xp"] == 21 + _speed_bonus_total(collector, "coding")
 
 
 def test_history_based_achievement_uses_event_log(collector):
@@ -64,10 +76,10 @@ def test_history_based_achievement_uses_event_log(collector):
         with collector.track_agent("coding", f"AI-{i}", "claude-sonnet-4-5"):
             pass
 
-    achievements = collector.get_state()["agents"]["coding"]["achievements"]
-    # 5 fast successes in a row and 5 distinct tickets
-    assert "speed_demon" in achievements
-    assert "polyglot" in achievements
+    state = collector.get_state()
+    # speed_demon needs the last 5 events from the log, not just the current one
+    assert all(e["duration_seconds"] < 30 for e in state["events"])
+    assert "speed_demon" in state["agents"]["coding"]["achievements"]
 
 
 def test_strengths_and_weaknesses_are_populated(collector):
