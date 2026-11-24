@@ -15,8 +15,25 @@ CORS Configuration:
     - Defaults to localhost origins for development security
     - Supports GET, POST, OPTIONS methods
     - Allows Content-Type, Authorization headers
-    - Set CORS_ALLOWED_ORIGINS='*' for development (with security warning)
+    - A request whose Origin is not allowed gets no CORS headers
+    - Set CORS_ALLOWED_ORIGINS='*' for development (with security warning);
+      credentials are never allowed together with '*'
     - For production, set specific domains (e.g., 'https://dashboard.example.com')
+
+WebSocket Origin check:
+    - /ws rejects a handshake with 403 when its Origin header is not allowed
+    - Allowed: origins in CORS_ALLOWED_ORIGINS, plus http://localhost,
+      http://127.0.0.1 and http://[::1] on the server's own port
+    - Clients that send no Origin header (scripts, curl) are not browsers and
+      are accepted; they are covered by the bearer token below
+
+Authentication:
+    - Set DASHBOARD_API_TOKEN to require "Authorization: Bearer <token>" on
+      /api/* and /ws (/health stays open)
+    - On a loopback host (127.0.0.1, localhost, ::1) the token is optional, so
+      local use needs no setup
+    - On any other host (e.g. --host 0.0.0.0) the server refuses to start
+      without DASHBOARD_API_TOKEN
 
 A2UI Component Integration:
     This server provides data that can be visualized using A2UI components:
@@ -59,11 +76,14 @@ Usage:
 
 import argparse
 import asyncio
+import hmac
+import ipaddress
 import json
 import logging
 import os
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from aiohttp import WSMsgType, web
 from aiohttp.web import Request, Response, WebSocketResponse, middleware
@@ -99,36 +119,134 @@ def get_cors_origins() -> str:
     return origins
 
 
+AUTH_TOKEN_ENV = 'DASHBOARD_API_TOKEN'
+PORT_KEY = web.AppKey('dashboard_port', int)
+AUTH_TOKEN_KEY = web.AppKey('dashboard_auth_token', str)
+
+
+def get_allowed_origin_list() -> list[str]:
+    """Return CORS_ALLOWED_ORIGINS as a list of origins ('*' stays a single entry).
+
+    Returns:
+        List of allowed origin strings, without empty entries.
+    """
+    return [o.strip() for o in get_cors_origins().split(',') if o.strip()]
+
+
+def is_loopback_host(host: str) -> bool:
+    """Tell whether a bind host only accepts connections from this machine.
+
+    Args:
+        host: Host name or IP address the server binds to.
+
+    Returns:
+        True for localhost and loopback IP addresses, False otherwise.
+    """
+    host = host.strip().strip('[]').lower()
+    if host == 'localhost':
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _loopback_origins(port: int | None) -> set[str]:
+    """Browser origins of pages served from loopback on the given port."""
+    if port is None:
+        return set()
+    hosts = ('localhost', '127.0.0.1', '[::1]')
+    return {f'http://{h}:{port}' for h in hosts}
+
+
+def is_origin_allowed(origin: str, port: int | None = None) -> bool:
+    """Check a browser Origin header against the allowed origins.
+
+    Args:
+        origin: Value of the request's Origin header.
+        port: Port this server listens on; loopback origins on it are allowed.
+
+    Returns:
+        True if CORS_ALLOWED_ORIGINS is '*', lists this origin, or the origin is
+        a loopback origin on the server's own port.
+    """
+    allowed = get_allowed_origin_list()
+    if '*' in allowed:
+        return True
+    if not origin:
+        return False
+    try:
+        parts = urlsplit(origin)
+        normalized = f'{parts.scheme}://{parts.netloc}'.lower()
+    except ValueError:
+        return False
+    if normalized in {o.lower().rstrip('/') for o in allowed}:
+        return True
+    return normalized in _loopback_origins(port)
+
+
+def _request_port(request: Request) -> int | None:
+    """Port this server is listening on, as recorded in the app."""
+    return request.app.get(PORT_KEY)
+
+
 # CORS middleware with environment-based configuration
 @middleware
 async def cors_middleware(request: Request, handler):
-    """Add CORS headers to all responses.
+    """Add CORS headers to responses for allowed origins.
 
     CORS origins are configured via CORS_ALLOWED_ORIGINS environment variable.
-    Defaults to localhost origins for development security.
+    Defaults to localhost origins for development security. A request from an
+    origin that is not allowed gets no CORS headers, so the browser blocks it.
     """
     response = await handler(request)
 
-    allowed_origins = get_cors_origins()
+    allowed_list = get_allowed_origin_list()
+    origin = request.headers.get('Origin', '')
 
-    # Handle multiple origins or wildcard
-    if allowed_origins == '*':
+    if '*' in allowed_list:
+        # Browsers reject credentials together with '*', so never send both.
         response.headers['Access-Control-Allow-Origin'] = '*'
+    elif origin and is_origin_allowed(origin, _request_port(request)):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Vary'] = 'Origin'
     else:
-        # Check if request origin is in allowed list
-        origin = request.headers.get('Origin', '')
-        allowed_list = [o.strip() for o in allowed_origins.split(',')]
-
-        if origin in allowed_list:
-            response.headers['Access-Control-Allow-Origin'] = origin
-        elif allowed_list:
-            # Default to first allowed origin if no match
-            response.headers['Access-Control-Allow-Origin'] = allowed_list[0]
+        return response
 
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
+
+
+def _is_protected_path(path: str) -> bool:
+    """Paths that need the bearer token when one is configured."""
+    return path == '/ws' or path.startswith('/api/') or path == '/api'
+
+
+@middleware
+async def auth_middleware(request: Request, handler):
+    """Require the configured bearer token on /api/* and /ws.
+
+    No-op when no token is configured. CORS preflight (OPTIONS) requests pass,
+    because browsers never send credentials on them.
+    """
+    token = request.app.get(AUTH_TOKEN_KEY)
+    if not token or request.method == 'OPTIONS' or not _is_protected_path(request.path):
+        return await handler(request)
+
+    header = request.headers.get('Authorization', '')
+    scheme, _, supplied = header.partition(' ')
+    if scheme.lower() == 'bearer' and hmac.compare_digest(
+        supplied.strip().encode(), token.encode()
+    ):
+        return await handler(request)
+
+    return web.json_response(
+        {'error': 'Unauthorized', 'message': 'Missing or invalid bearer token'},
+        status=401,
+        headers={'WWW-Authenticate': 'Bearer'},
+    )
 
 
 # Error handling middleware
@@ -165,7 +283,8 @@ class DashboardServer:
         project_name: str = "agent-status-dashboard",
         metrics_dir: Path | None = None,
         port: int = 8080,
-        host: str = "127.0.0.1"
+        host: str = "127.0.0.1",
+        auth_token: str | None = None,
     ):
         """Initialize DashboardServer.
 
@@ -174,6 +293,11 @@ class DashboardServer:
             metrics_dir: Directory containing .agent_metrics.json
             port: HTTP server port
             host: HTTP server host (default: 127.0.0.1 for localhost-only access)
+            auth_token: Bearer token required on /api/* and /ws. Defaults to the
+                DASHBOARD_API_TOKEN environment variable; empty means no token.
+
+        Raises:
+            ValueError: If host is not a loopback address and no token is set.
 
         Security Notes:
             - Default host is 127.0.0.1 (localhost only) for security
@@ -184,6 +308,16 @@ class DashboardServer:
         self.metrics_dir = metrics_dir or Path.cwd()
         self.port = port
         self.host = host
+        if auth_token is None:
+            auth_token = os.getenv(AUTH_TOKEN_ENV, '')
+        self.auth_token = auth_token.strip()
+
+        if not self.auth_token and not is_loopback_host(host):
+            raise ValueError(
+                f"Refusing to bind to non-loopback host {host!r} without authentication. "
+                f"Set {AUTH_TOKEN_ENV} to a long random value; clients must then send "
+                "'Authorization: Bearer <token>'."
+            )
 
         # Security warning for 0.0.0.0 binding
         if host == "0.0.0.0":
@@ -206,7 +340,11 @@ class DashboardServer:
         self.broadcast_interval = 5  # seconds
 
         # Create app with middlewares
-        self.app = web.Application(middlewares=[error_middleware, cors_middleware])
+        self.app = web.Application(
+            middlewares=[error_middleware, cors_middleware, auth_middleware]
+        )
+        self.app[PORT_KEY] = port
+        self.app[AUTH_TOKEN_KEY] = self.auth_token
 
         # Register routes
         self._setup_routes()
@@ -371,9 +509,25 @@ class DashboardServer:
         Accepts WebSocket connections and broadcasts metrics updates to all connected clients.
         Clients receive JSON-formatted metrics data every 5 seconds.
 
+        Browsers do not apply CORS to WebSockets, so a handshake whose Origin is
+        not allowed is rejected here; otherwise any web page could read the
+        metrics stream. Requests without an Origin header come from non-browser
+        clients and are accepted (the bearer token, when set, still applies).
+
         Returns:
             WebSocketResponse configured for metrics streaming
+
+        Raises:
+            403: If the Origin header is present and not allowed
         """
+        origin = request.headers.get('Origin')
+        if origin is not None and not is_origin_allowed(origin, self.port):
+            logger.warning(f"Rejected WebSocket handshake from origin {origin!r}")
+            raise web.HTTPForbidden(
+                text=json.dumps({'error': 'Origin not allowed'}),
+                content_type='application/json',
+            )
+
         ws = WebSocketResponse()
         await ws.prepare(request)
 
@@ -560,7 +714,10 @@ A2UI Components:
         '--host',
         type=str,
         default='127.0.0.1',
-        help='HTTP server host (default: 127.0.0.1 for localhost-only access; use 0.0.0.0 to expose to network)'
+        help=(
+            'HTTP server host (default: 127.0.0.1 for localhost-only access; '
+            f'a non-loopback host such as 0.0.0.0 requires {AUTH_TOKEN_ENV})'
+        )
     )
 
     parser.add_argument(
@@ -580,12 +737,15 @@ A2UI Components:
     args = parser.parse_args()
 
     # Create and run server
-    server = DashboardServer(
-        project_name=args.project_name,
-        metrics_dir=args.metrics_dir,
-        port=args.port,
-        host=args.host
-    )
+    try:
+        server = DashboardServer(
+            project_name=args.project_name,
+            metrics_dir=args.metrics_dir,
+            port=args.port,
+            host=args.host
+        )
+    except ValueError as e:
+        parser.error(str(e))
 
     server.run()
 
