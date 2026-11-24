@@ -12,7 +12,7 @@ import json
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from metrics import AgentProfile, DashboardState
@@ -26,7 +26,7 @@ BASE_URL = f'http://{SERVER_HOST}:{SERVER_PORT}'
 
 def create_demo_metrics():
     """Create demo metrics data for testing."""
-    now = datetime.utcnow().isoformat() + 'Z'
+    now = datetime.now(UTC).replace(tzinfo=None).isoformat() + 'Z'
 
     # Create demo agent profiles
     coding_agent: AgentProfile = {
