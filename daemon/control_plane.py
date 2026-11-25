@@ -108,10 +108,11 @@ class ControlPlane:
 
         except (TimeoutError, ConnectionError, asyncio.IncompleteReadError):
             pass
-        except Exception as e:
-            logger.warning("Control plane request error: %s", e)
+        except Exception:
+            # Log the detail; the client only gets a generic message.
+            logger.exception("Control plane request error")
             try:
-                await self._send_response(writer, 500, {"error": str(e)})
+                await self._send_response(writer, 500, {"error": "Internal server error"})
             except Exception:
                 pass
         finally:

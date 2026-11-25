@@ -160,9 +160,9 @@ def test_quarantine_never_overwrites_existing_copy(seeded, monkeypatch):
 
     class FixedDatetime:
         @staticmethod
-        def utcnow():
+        def now(tz=None):
             from datetime import datetime
-            return datetime(2026, 1, 1)
+            return datetime(2026, 1, 1, tzinfo=tz)
 
     monkeypatch.setattr("metrics_store.datetime", FixedDatetime)
     store.metrics_path.write_text("first")

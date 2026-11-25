@@ -26,7 +26,7 @@ Usage:
 import contextlib
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -124,7 +124,7 @@ class AgentTracker:
         Returns:
             Complete AgentEvent with all fields populated
         """
-        ended_at = datetime.utcnow().isoformat() + "Z"
+        ended_at = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
         duration_seconds = time.time() - self.start_time
 
         # Calculate cost
@@ -189,7 +189,7 @@ def _create_empty_profile(agent_name: str) -> AgentProfile:
     Returns:
         Empty AgentProfile with all counters at zero
     """
-    now = datetime.utcnow().isoformat() + "Z"
+    now = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
 
     profile: AgentProfile = {
         "agent_name": agent_name,
@@ -342,7 +342,7 @@ class AgentMetricsCollector:
             Session ID (UUID)
         """
         session_id = str(uuid.uuid4())
-        started_at = datetime.utcnow().isoformat() + "Z"
+        started_at = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
 
         # Provisional session number; end_session() assigns the final one
         # under the store lock so concurrent collectors cannot collide.
@@ -380,7 +380,7 @@ class AgentMetricsCollector:
             raise ValueError(f"Session {session_id} is not an active session")
 
         session_info = self._active_sessions[session_id]
-        ended_at = datetime.utcnow().isoformat() + "Z"
+        ended_at = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
 
         # Create session summary
         session_summary: SessionSummary = {
@@ -441,7 +441,7 @@ class AgentMetricsCollector:
         """
         # Generate event ID and timestamps
         event_id = str(uuid.uuid4())
-        started_at = datetime.utcnow().isoformat() + "Z"
+        started_at = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
 
         # Use provided session or create temporary one
         temp_session = session_id is None

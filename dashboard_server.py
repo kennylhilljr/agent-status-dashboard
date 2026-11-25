@@ -85,7 +85,7 @@ import ipaddress
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -100,6 +100,24 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Body returned for unexpected server errors. Details (exception text, file
+# paths, lock errors) go to the server log only, never to the client.
+INTERNAL_ERROR_MESSAGE = 'Internal server error'
+
+
+def _utc_timestamp() -> str:
+    """Current UTC time as an ISO 8601 string ending in 'Z'."""
+    return datetime.now(UTC).replace(tzinfo=None).isoformat() + 'Z'
+
+
+def _internal_error_body() -> str:
+    """JSON body for a 500 response that reveals no internal details."""
+    return json.dumps({
+        'error': 'InternalServerError',
+        'message': INTERNAL_ERROR_MESSAGE,
+        'timestamp': _utc_timestamp(),
+    })
 
 
 # Get CORS allowed origins from environment
@@ -290,15 +308,14 @@ async def error_middleware(request: Request, handler):
     except web.HTTPException:
         # Let HTTP exceptions pass through
         raise
-    except Exception as ex:
+    except Exception:
+        # Log the detail; the client only gets a generic message, because
+        # exception text can contain file paths and lock errors.
         logger.exception(f"Error handling request {request.method} {request.path}")
-        return web.json_response(
-            {
-                'error': type(ex).__name__,
-                'message': str(ex),
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            },
-            status=500
+        return web.Response(
+            text=_internal_error_body(),
+            content_type='application/json',
+            status=500,
         )
 
 
@@ -370,6 +387,9 @@ class DashboardServer:
         self.websockets: set[WebSocketResponse] = set()
         self.broadcast_task: asyncio.Task | None = None
         self.broadcast_interval = 5  # seconds
+        # (file signature, serialized state) of the last loaded state, so an
+        # unchanged metrics file is not re-read or re-serialized every tick
+        self._broadcast_cache: tuple[tuple[int, int, int] | None, str] | None = None
 
         # Create app with middlewares
         self.app = web.Application(
@@ -387,6 +407,67 @@ class DashboardServer:
 
         logger.info(f"Dashboard server initialized for project: {project_name}")
         logger.info(f"Metrics directory: {self.metrics_dir}")
+
+    async def _load_state(self):
+        """Load metrics state in a worker thread.
+
+        MetricsStore.load() takes an fcntl lock with a retry loop of up to
+        LOCK_TIMEOUT seconds and does file I/O, so it must not run on the event
+        loop: a writer holding the lock would stall every HTTP and WebSocket
+        client.
+        """
+        return await asyncio.to_thread(self.store.load)
+
+    def _metrics_signature(self) -> tuple[int, int, int] | None:
+        """Identify the current metrics file version (inode, mtime, size).
+
+        MetricsStore writes by atomic rename, so every save changes the inode.
+
+        Returns:
+            The signature, or None if the metrics file does not exist.
+        """
+        try:
+            st = os.stat(self.store.metrics_path)
+        except FileNotFoundError:
+            return None
+        return (st.st_ino, st.st_mtime_ns, st.st_size)
+
+    async def _serialized_state(self) -> str:
+        """Return the metrics state as JSON, re-reading the file only when it changed.
+
+        Returns:
+            The state serialized with json.dumps.
+
+        Raises:
+            Exception: Whatever MetricsStore.load() raises; the cache is kept.
+        """
+        signature = await asyncio.to_thread(self._metrics_signature)
+        cache = self._broadcast_cache
+        if cache is not None and cache[0] == signature:
+            return cache[1]
+
+        state = await self._load_state()
+        data = json.dumps(state)
+        # load() returns a fresh empty state when it cannot get the file lock.
+        # Caching that under the real file's signature would keep serving empty
+        # metrics until the file next changes, so only non-empty states are
+        # cached. An empty state is cheap to reload on the next tick.
+        if state.get('events') or state.get('sessions') or state.get('agents'):
+            self._broadcast_cache = (signature, data)
+        else:
+            self._broadcast_cache = None
+        return data
+
+    @staticmethod
+    def _metrics_message(data: str) -> str:
+        """Build a metrics_update WebSocket message around serialized state."""
+        return (
+            '{"type": "metrics_update", "timestamp": '
+            + json.dumps(_utc_timestamp())
+            + ', "data": '
+            + data
+            + '}'
+        )
 
     def _setup_routes(self):
         """Register HTTP routes and WebSocket endpoint."""
@@ -409,11 +490,11 @@ class DashboardServer:
         Returns:
             JSON response with server status and metrics file info
         """
-        stats = self.store.get_stats()
+        stats = await asyncio.to_thread(self.store.get_stats)
 
         return web.json_response({
             'status': 'ok',
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': _utc_timestamp(),
             'project': self.project_name,
             'metrics_file_exists': stats['metrics_file_exists'],
             'event_count': stats['event_count'],
@@ -439,7 +520,7 @@ class DashboardServer:
         logger.info("GET /api/metrics")
 
         try:
-            state = self.store.load()
+            state = await self._load_state()
 
             # Check if client wants pretty-printed JSON
             pretty = 'pretty' in request.query
@@ -454,12 +535,12 @@ class DashboardServer:
             else:
                 return web.json_response(state)
 
-        except Exception as e:
-            logger.error(f"Error loading metrics: {e}")
+        except Exception:
+            logger.exception("Error loading metrics")
             raise web.HTTPInternalServerError(
-                text=json.dumps({'error': str(e)}),
+                text=_internal_error_body(),
                 content_type='application/json'
-            )
+            ) from None
 
     async def get_agent(self, request: Request) -> Response:
         """Get specific agent profile by name.
@@ -481,7 +562,7 @@ class DashboardServer:
         logger.info(f"GET /api/agents/{agent_name}")
 
         try:
-            state = self.store.load()
+            state = await self._load_state()
 
             # Check if agent exists
             if agent_name not in state['agents']:
@@ -528,12 +609,12 @@ class DashboardServer:
 
         except web.HTTPNotFound:
             raise
-        except Exception as e:
-            logger.error(f"Error loading agent {agent_name}: {e}")
+        except Exception:
+            logger.exception(f"Error loading agent {agent_name}")
             raise web.HTTPInternalServerError(
-                text=json.dumps({'error': str(e)}),
+                text=_internal_error_body(),
                 content_type='application/json'
-            )
+            ) from None
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
@@ -572,14 +653,9 @@ class DashboardServer:
         try:
             # Send initial metrics immediately
             try:
-                state = self.store.load()
-                await ws.send_json({
-                    'type': 'metrics_update',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
-                    'data': state
-                })
-            except Exception as e:
-                logger.error(f"Error sending initial metrics to WebSocket {client_id}: {e}")
+                await ws.send_str(self._metrics_message(await self._serialized_state()))
+            except Exception:
+                logger.exception(f"Error sending initial metrics to WebSocket {client_id}")
 
             # Listen for client messages (mostly for ping/pong and close)
             async for msg in ws:
@@ -612,25 +688,22 @@ class DashboardServer:
                 if not self.websockets:
                     continue
 
-                # Load current metrics
+                # Load current metrics off the event loop, re-reading the
+                # file only if it changed since the last load
                 try:
-                    state = self.store.load()
-                except Exception as e:
-                    logger.error(f"Error loading metrics for broadcast: {e}")
+                    data = await self._serialized_state()
+                except Exception:
+                    logger.exception("Error loading metrics for broadcast")
                     continue
 
-                # Prepare broadcast message
-                message = {
-                    'type': 'metrics_update',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
-                    'data': state
-                }
+                # Serialize the message once for all clients
+                message = self._metrics_message(data)
 
                 # Broadcast to all connected clients
                 disconnected = set()
-                for ws in self.websockets:
+                for ws in list(self.websockets):
                     try:
-                        await ws.send_json(message)
+                        await ws.send_str(message)
                     except Exception as e:
                         logger.error(f"Error broadcasting to WebSocket {id(ws)}: {e}")
                         disconnected.add(ws)

@@ -22,7 +22,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
 
@@ -141,7 +141,7 @@ class MetricsStore:
         Returns:
             A new DashboardState with initialized fields and zero counters
         """
-        now = datetime.utcnow().isoformat() + "Z"
+        now = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
 
         return {
             "version": 1,
@@ -238,7 +238,7 @@ class MetricsStore:
         Returns:
             The path the corrupted bytes are preserved at.
         """
-        stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
         n = 0
         while True:
             suffix = f".corrupt-{stamp}" + (f"-{n}" if n else "")
@@ -300,7 +300,7 @@ class MetricsStore:
         if not self._validate_state(state):
             raise ValueError("Invalid DashboardState structure - cannot save")
 
-        state["updated_at"] = datetime.utcnow().isoformat() + "Z"
+        state["updated_at"] = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
         state = self._apply_fifo_eviction(state)
 
         # Create atomic backup of existing file before overwriting
