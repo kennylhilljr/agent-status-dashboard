@@ -163,9 +163,11 @@ def _created_test_file(artifact: str) -> str | None:
     path, sep, action = artifact[len("file:") :].rpartition(":")
     if not sep or action != "created" or not path:
         return None
-    if not _is_test_file_path(path):
+    # Normalize first so "tests/../src/app.py" is classified as "src/app.py"
+    normalized = posixpath.normpath(path.replace("\\", "/"))
+    if not _is_test_file_path(normalized):
         return None
-    return posixpath.normpath(path.replace("\\", "/"))
+    return normalized
 
 
 class AgentTracker:

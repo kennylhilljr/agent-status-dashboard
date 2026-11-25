@@ -149,6 +149,8 @@ def test_created_test_file_parser():
     assert _created_test_file("file:test_a.py") is None
     assert _created_test_file("commit:test_a.py:created") is None
     assert _created_test_file("file::created") is None
+    assert _created_test_file("file:tests/../src/app.py:created") is None
+    assert _created_test_file("file:src/../tests/test_a.py:created") == "tests/test_a.py"
 
 
 def test_detector_output_through_track_agent(tmp_path):
