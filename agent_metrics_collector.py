@@ -155,7 +155,8 @@ def _parse_file_artifact(artifact: str) -> tuple[str, str | None]:
     Accepts ``file:<path>:<action>`` (the artifact detector's format),
     ``file:created:<path>`` / ``file:modified:<path>`` (legacy, action first)
     and ``file:<path>`` (no action). The action is a whole field, never a
-    substring of the path.
+    substring of the path. When a path itself contains ``:``, the trailing
+    field is the action.
 
     Args:
         artifact: Artifact string starting with ``file:``
@@ -165,7 +166,8 @@ def _parse_file_artifact(artifact: str) -> tuple[str, str | None]:
     """
     rest = artifact[len("file:") :]
     head, sep, tail = rest.partition(":")
-    if sep and head in ("created", "modified") and tail:
+    # Legacy action-first only when unambiguous: one action and a colon-free path
+    if sep and head in ("created", "modified") and tail and ":" not in tail:
         return tail, head
     path, sep, action = rest.rpartition(":")
     if sep and path and _FILE_ACTION_RE.match(action):

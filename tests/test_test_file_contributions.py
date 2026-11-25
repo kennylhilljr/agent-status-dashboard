@@ -126,6 +126,21 @@ def test_legacy_action_first_test_file():
     assert profile["xp"] == BASE_XP + 20
 
 
+@pytest.mark.parametrize(
+    ("artifact", "created", "modified"),
+    [
+        ("file:created:test_agent.py:modified", 0, 1),
+        ("file:created:test_agent.py:deleted", 0, 0),
+        ("file:modified:src/a.py:created", 1, 0),
+        ("file:C:/repo/tests/test_a.py:created", 1, 0),
+    ],
+)
+def test_colon_paths_use_trailing_action(artifact, created, modified):
+    profile = _apply([artifact])
+    assert profile["files_created"] == created
+    assert profile["files_modified"] == modified
+
+
 def test_unknown_action_is_not_a_creation():
     profile = _apply(["file:src/created/report.py:deleted", "file:tests/test_x.py:deleted"])
     assert profile["files_created"] == 0
