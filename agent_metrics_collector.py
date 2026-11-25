@@ -27,6 +27,7 @@ import contextlib
 import importlib.util
 import logging
 import posixpath
+import re
 import sys
 import time
 import uuid
@@ -92,13 +93,12 @@ DEFAULT_PRICING = {"input": 0.003, "output": 0.015}
 # Models already warned about, so an unpriced model logs once per process
 _warned_unpriced_models: set[str] = set()
 
-# Artifact prefix + keyword -> (profile counter, XP contribution type or None)
+# Artifact prefix + keyword -> (profile counter, XP contribution type or None).
+# "file:" artifacts are parsed structurally in _update_agent_profile instead.
 _ARTIFACT_RULES: list[tuple[str, str | None, str, str | None]] = [
     ("commit:", None, "commits_made", "commit"),
     ("pr:", "created", "prs_created", "pr_created"),
     ("pr:", "merged", "prs_merged", "pr_merged"),
-    ("file:", "created", "files_created", "file_created"),
-    ("file:", "modified", "files_modified", "file_modified"),
     ("issue:", "created", "issues_created", "issue_created"),
     ("issue:", "completed", "issues_completed", "ticket_completed"),
     ("message:", None, "messages_sent", None),
@@ -146,11 +146,47 @@ def _is_test_file_path(path: str) -> bool:
     return any(part in _TEST_DIRS for part in parts[:-1])
 
 
-def _created_test_file(artifact: str) -> str | None:
-    """Return the normalized path if ``artifact`` is ``file:<path>:created`` for a test file.
+_FILE_ACTION_RE = re.compile(r"^[a-z_]+$")
 
-    Only the final ``:``-separated field is treated as the action, so a path
-    containing "created" does not turn a modification into a creation.
+
+def _parse_file_artifact(artifact: str) -> tuple[str, str | None]:
+    """Split a ``file:`` artifact into (path, action).
+
+    Accepts ``file:<path>:<action>`` (the artifact detector's format),
+    ``file:created:<path>`` / ``file:modified:<path>`` (legacy, action first)
+    and ``file:<path>`` (no action). The action is a whole field, never a
+    substring of the path.
+
+    Args:
+        artifact: Artifact string starting with ``file:``
+
+    Returns:
+        (path, action); action is None when the artifact has no action field
+    """
+    rest = artifact[len("file:") :]
+    head, sep, tail = rest.partition(":")
+    if sep and head in ("created", "modified") and tail:
+        return tail, head
+    path, sep, action = rest.rpartition(":")
+    if sep and path and _FILE_ACTION_RE.match(action):
+        return path, action
+    return rest, None
+
+
+def _normalize_file_path(path: str) -> str:
+    """Normalize an artifact path so equivalent spellings compare equal.
+
+    Args:
+        path: File path from an artifact
+
+    Returns:
+        Normalized POSIX-style path
+    """
+    return posixpath.normpath(path.replace("\\", "/"))
+
+
+def _created_test_file(artifact: str) -> str | None:
+    """Return the normalized path if ``artifact`` records a newly created test file.
 
     Args:
         artifact: Artifact string
@@ -160,11 +196,11 @@ def _created_test_file(artifact: str) -> str | None:
     """
     if not artifact.startswith("file:"):
         return None
-    path, sep, action = artifact[len("file:") :].rpartition(":")
-    if not sep or action != "created" or not path:
+    path, action = _parse_file_artifact(artifact)
+    if action != "created" or not path:
         return None
     # Normalize first so "tests/../src/app.py" is classified as "src/app.py"
-    normalized = posixpath.normpath(path.replace("\\", "/"))
+    normalized = _normalize_file_path(path)
     if not _is_test_file_path(normalized):
         return None
     return normalized
@@ -424,16 +460,18 @@ def _update_agent_profile(
                 profile["tests_written"] = profile.get("tests_written", 0) + 1
                 contribution_xp += calculate_xp_for_contribution_type("test_written")
             continue
-        # "file:<path>:<action>": match the action field exactly, so a path
-        # containing "created" is not a creation. Other formats keep substring matching.
-        file_action = artifact.rpartition(":")[2] if artifact.startswith("file:") else ""
-        exact_action = file_action in ("created", "modified")
+        if artifact.startswith("file:"):
+            # Match the parsed action field, never a substring of the path
+            _, action = _parse_file_artifact(artifact)
+            if action == "created":
+                profile["files_created"] += 1
+                contribution_xp += calculate_xp_for_contribution_type("file_created")
+            elif action == "modified":
+                profile["files_modified"] += 1
+                contribution_xp += calculate_xp_for_contribution_type("file_modified")
+            continue
         for prefix, keyword, counter, contribution in _ARTIFACT_RULES:
-            if exact_action and prefix == "file:":
-                matched = keyword == file_action
-            else:
-                matched = keyword is None or keyword in artifact
-            if artifact.startswith(prefix) and matched:
+            if artifact.startswith(prefix) and (keyword is None or keyword in artifact):
                 profile[counter] += 1
                 if contribution is not None:
                     contribution_xp += calculate_xp_for_contribution_type(contribution)
