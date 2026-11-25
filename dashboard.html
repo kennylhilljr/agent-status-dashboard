@@ -708,6 +708,19 @@
         let isManualClose = false;
 
         // Utility Functions
+
+        // Escape a value for interpolation into HTML text or a quoted attribute.
+        // Every API or WebSocket value that goes into an innerHTML template must
+        // pass through this, numbers included (the JSON may hold strings there).
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function formatTime(date) {
             return new Intl.DateTimeFormat('en-US', {
                 hour: '2-digit',
@@ -768,8 +781,8 @@
 
             statsGrid.innerHTML = stats.map(stat => `
                 <div class="stat-card">
-                    <div class="stat-value">${stat.value}</div>
-                    <div class="stat-label">${stat.icon} ${stat.label}</div>
+                    <div class="stat-value">${escapeHtml(stat.value)}</div>
+                    <div class="stat-label">${stat.icon} ${escapeHtml(stat.label)}</div>
                 </div>
             `).join('');
         }
@@ -796,12 +809,12 @@
                 const offset = circumference - (percentage / 100) * circumference;
 
                 return `
-                    <div class="card task-card" onclick="viewAgentDetails('${name}')">
+                    <div class="card task-card" data-agent="${escapeHtml(name)}">
                         <div class="card-header">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h3 class="card-title">🤖 ${name}</h3>
+                                <h3 class="card-title">🤖 ${escapeHtml(name)}</h3>
                                 <span class="task-status-badge ${statusClass}">
-                                    Level ${agent.level || 1}
+                                    Level ${escapeHtml(agent.level || 1)}
                                 </span>
                             </div>
                         </div>
@@ -830,7 +843,7 @@
                                         </svg>
                                         Tasks Completed
                                     </span>
-                                    <span class="metric-value">${agent.successful_invocations || 0}</span>
+                                    <span class="metric-value">${escapeHtml(agent.successful_invocations || 0)}</span>
                                 </div>
                                 <div class="progress-metric">
                                     <span class="metric-label">
@@ -839,7 +852,7 @@
                                         </svg>
                                         Files Modified
                                     </span>
-                                    <span class="metric-value">${agent.files_modified || 0}</span>
+                                    <span class="metric-value">${escapeHtml(agent.files_modified || 0)}</span>
                                 </div>
                                 <div class="progress-metric">
                                     <span class="metric-label">
@@ -848,7 +861,7 @@
                                         </svg>
                                         Tests Written
                                     </span>
-                                    <span class="metric-value">${agent.tests_written || 0}</span>
+                                    <span class="metric-value">${escapeHtml(agent.tests_written || 0)}</span>
                                 </div>
                                 <div class="progress-metric">
                                     <span class="metric-label">
@@ -857,14 +870,14 @@
                                         </svg>
                                         XP Earned
                                     </span>
-                                    <span class="metric-value">${agent.xp || 0}</span>
+                                    <span class="metric-value">${escapeHtml(agent.xp || 0)}</span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="task-metadata">
                             <span>💸 $${(agent.total_cost_usd || 0).toFixed(2)}</span>
-                            <span>🔥 ${agent.current_streak || 0} streak</span>
+                            <span>🔥 ${escapeHtml(agent.current_streak || 0)} streak</span>
                             <span>⏱️ ${Math.round(agent.avg_duration_seconds || 0)}s avg</span>
                         </div>
                     </div>
@@ -906,8 +919,9 @@
 
             feed.innerHTML = recentEvents.map((event, index) => {
                 const eventType = event.event_type || 'task_completed';
-                const color = eventTypeColors[eventType] || '#60a5fa';
-                const icon = eventTypeIcons[eventType] || '•';
+                const knownType = Object.prototype.hasOwnProperty.call(eventTypeColors, eventType);
+                const color = knownType ? eventTypeColors[eventType] : '#60a5fa';
+                const icon = knownType ? eventTypeIcons[eventType] : '•';
                 const showLine = index < recentEvents.length - 1;
 
                 return `
@@ -920,11 +934,11 @@
                         </div>
                         <div class="activity-content">
                             <div class="activity-header">
-                                <div class="activity-title">${event.agent_name || 'Unknown'}</div>
+                                <div class="activity-title">${escapeHtml(event.agent_name || 'Unknown')}</div>
                                 <div class="activity-time">${formatRelativeTime(event.timestamp)}</div>
                             </div>
                             <div class="activity-description">
-                                ${event.event_type || 'Activity'} - ${event.description || event.outcome || 'No description'}
+                                ${escapeHtml(event.event_type || 'Activity')} - ${escapeHtml(event.description || event.outcome || 'No description')}
                             </div>
                         </div>
                     </div>
@@ -1281,7 +1295,7 @@
                             <div class="error-title">⚠️ Dashboard Error</div>
                             <span class="error-severity-badge severity-error">ERROR</span>
                         </div>
-                        <div class="error-message">${message}</div>
+                        <div class="error-message">${escapeHtml(message)}</div>
                     </div>
                 </div>
             `;
@@ -1291,10 +1305,17 @@
             console.log('Viewing details for agent:', agentName);
             // Could implement modal or navigation to detail view
             alert(`Agent Details: ${agentName}\n\nClick OK to view in browser console.`);
-            fetch(`${API_BASE_URL}/api/agents/${agentName}?include_events`)
+            fetch(`${API_BASE_URL}/api/agents/${encodeURIComponent(agentName)}?include_events`)
                 .then(r => r.json())
                 .then(data => console.log('Agent Details:', data));
         }
+
+        // Agent cards carry their name in data-agent; one delegated listener opens
+        // details, so the name never lands in an inline event handler.
+        document.getElementById('agent-cards').addEventListener('click', (event) => {
+            const card = event.target.closest('.task-card[data-agent]');
+            if (card) viewAgentDetails(card.dataset.agent);
+        });
 
         // WebSocket Connection Management
         function updateConnectionStatus(status, message) {
