@@ -94,8 +94,8 @@ DEFAULT_PRICING = {"input": 0.003, "output": 0.015}
 _warned_unpriced_models: set[str] = set()
 
 # Artifact prefix + keyword -> (profile counter, XP contribution type or None).
-# The keyword must equal the last colon-separated field (the status in
-# "pr:<id>:merged"); it is never searched for as a substring of the artifact.
+# The keyword must equal the artifact's status field ("pr:<id>:merged", or the
+# legacy "pr:merged:<id>"); see _artifact_status. It is never a substring match.
 # "file:" artifacts are parsed structurally in _update_agent_profile instead.
 _ARTIFACT_RULES: list[tuple[str, str | None, str, str | None]] = [
     ("commit:", None, "commits_made", "commit"),
@@ -106,6 +106,7 @@ _ARTIFACT_RULES: list[tuple[str, str | None, str, str | None]] = [
     ("message:", None, "messages_sent", None),
     ("review:", None, "reviews_completed", None),
 ]
+_ARTIFACT_STATUSES = frozenset(k for _, k, _, _ in _ARTIFACT_RULES if k is not None)
 
 
 # Newly created files that count as tests_written (20 XP instead of file_created XP)
@@ -181,9 +182,11 @@ def _parse_file_artifact(artifact: str) -> tuple[str, str | None]:
 def _artifact_status(artifact: str) -> str | None:
     """Return the status field of a ``<kind>:<id>:<status>`` artifact.
 
-    The status is the last colon-separated field, so ``pr:#7:merged`` gives
-    ``merged``. Artifacts with fewer than three fields (``commit:abc123``)
-    have no status and give None.
+    The detector format puts the status last (``pr:#7:merged``); the legacy
+    format puts it first (``pr:created:#7``). As with ``file:`` artifacts, a
+    trailing status-shaped field wins and the legacy form is used only
+    otherwise. The status is a whole field, never a substring of the id.
+    Artifacts with fewer than three fields (``commit:abc123``) have none.
 
     Args:
         artifact: Artifact string such as ``pr:12:created``
@@ -193,7 +196,13 @@ def _artifact_status(artifact: str) -> str | None:
     """
     if artifact.count(":") < 2:
         return None
-    return artifact.rsplit(":", 1)[1]
+    status = artifact.rsplit(":", 1)[1]
+    if _FILE_ACTION_RE.match(status):
+        return status
+    legacy = artifact.split(":", 2)[1]
+    if legacy in _ARTIFACT_STATUSES:
+        return legacy
+    return None
 
 
 def _normalize_file_path(path: str) -> str:
