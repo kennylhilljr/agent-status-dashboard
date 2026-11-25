@@ -133,6 +133,8 @@ def test_legacy_action_first_test_file():
         ("file:created:test_agent.py:deleted", 0, 0),
         ("file:modified:src/a.py:created", 1, 0),
         ("file:C:/repo/tests/test_a.py:created", 1, 0),
+        ("file:created:modified", 0, 1),
+        ("file:created:deleted", 0, 0),
     ],
 )
 def test_colon_paths_use_trailing_action(artifact, created, modified):
