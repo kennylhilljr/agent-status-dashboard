@@ -424,8 +424,16 @@ def _update_agent_profile(
                 profile["tests_written"] = profile.get("tests_written", 0) + 1
                 contribution_xp += calculate_xp_for_contribution_type("test_written")
             continue
+        # "file:<path>:<action>": match the action field exactly, so a path
+        # containing "created" is not a creation. Other formats keep substring matching.
+        file_action = artifact.rpartition(":")[2] if artifact.startswith("file:") else ""
+        exact_action = file_action in ("created", "modified")
         for prefix, keyword, counter, contribution in _ARTIFACT_RULES:
-            if artifact.startswith(prefix) and (keyword is None or keyword in artifact):
+            if exact_action and prefix == "file:":
+                matched = keyword == file_action
+            else:
+                matched = keyword is None or keyword in artifact
+            if artifact.startswith(prefix) and matched:
                 profile[counter] += 1
                 if contribution is not None:
                     contribution_xp += calculate_xp_for_contribution_type(contribution)

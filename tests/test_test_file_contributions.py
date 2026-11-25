@@ -96,11 +96,26 @@ def test_modified_test_file_is_not_written():
     assert profile["xp"] == BASE_XP + 2
 
 
-def test_path_containing_created_is_not_a_test_written():
-    # Only the final field is the action, so this modification is not a new test
+def test_path_containing_created_is_a_modification():
+    # Only the final field is the action
     profile = _apply(["file:tests/created/test_foo.py:modified"])
     assert profile["tests_written"] == 0
-    assert profile["xp"] < BASE_XP + 20
+    assert profile["files_created"] == 0
+    assert profile["files_modified"] == 1
+    assert profile["xp"] == BASE_XP + 2
+
+
+def test_path_containing_modified_is_a_creation():
+    profile = _apply(["file:src/modified/app.py:created"])
+    assert profile["files_created"] == 1
+    assert profile["files_modified"] == 0
+    assert profile["xp"] == BASE_XP + 3
+
+
+def test_legacy_file_artifact_formats_still_count():
+    profile = _apply(["file:created:agent.py", "file:src/foo.py"])
+    assert profile["files_created"] == 1
+    assert profile["files_modified"] == 0
 
 
 def test_tests_run_artifact_is_not_a_test_written():
