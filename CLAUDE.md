@@ -517,14 +517,14 @@ Agents earn XP and achievements:
 - **Achievements**: 12 types including:
   - first_blood: First successful invocation
   - century_club: 100 successful invocations
-  - perfect_day: 10+ invocations in one session with no errors
+  - perfect_day: 10+ successes in one session, none of its own errors, session not ended with `error` (checked at `end_session`)
   - speed_demon: 5 consecutive completions under 30 seconds
   - comeback_kid: Success after 3+ consecutive errors
   - big_spender: Single invocation over $1.00
   - penny_pincher: 50+ successes at < $0.01 each
   - marathon: 100+ invocations in single project
-  - polyglot: Used across 5+ different ticket types
-  - night_owl: Invocation between 00:00-05:00 local time
+  - polyglot: Used across 5+ distinct ticket-key prefixes (e.g. AI, HS, CTX)
+  - night_owl: Invocation started between 00:00-05:00 host local time (timestamps stored in UTC)
   - streak_10: 10 consecutive successes
   - streak_25: 25 consecutive successes
 

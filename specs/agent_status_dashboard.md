@@ -261,14 +261,14 @@ class AgentMetricsCollector:
 |---|---|---|
 | `first_blood` | First Blood | First successful invocation |
 | `century_club` | Century Club | 100 successful invocations |
-| `perfect_day` | Perfect Day | 10+ invocations in one session, 0 errors |
+| `perfect_day` | Perfect Day | 10+ successes in one session, 0 own errors (checked at session end) |
 | `speed_demon` | Speed Demon | 5 consecutive completions under 30s |
 | `comeback_kid` | Comeback Kid | Success immediately after 3+ consecutive errors |
 | `big_spender` | Big Spender | Single invocation over $1.00 |
 | `penny_pincher` | Penny Pincher | 50+ successes at < $0.01 each |
 | `marathon` | Marathon Runner | 100+ invocations in a single project |
-| `polyglot` | Polyglot | Agent used across 5+ different ticket types |
-| `night_owl` | Night Owl | Invocation between 00:00-05:00 local time |
+| `polyglot` | Polyglot | Agent used across 5+ distinct ticket-key prefixes (e.g. AI, HS, CTX) |
+| `night_owl` | Night Owl | Invocation between 00:00-05:00 host local time (stored timestamps are UTC) |
 | `streak_10` | On Fire | 10 consecutive successes |
 | `streak_25` | Unstoppable | 25 consecutive successes |
 

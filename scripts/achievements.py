@@ -9,14 +9,14 @@ and provide visual feedback on agent accomplishments.
 Supported Achievements (12 total):
 1. first_blood (🩸) - First successful invocation
 2. century_club (💯) - 100 successful invocations
-3. perfect_day (✨) - 10+ invocations in one session, 0 errors
+3. perfect_day (✨) - 10+ successes in one session, 0 own errors (checked at session end)
 4. speed_demon (⚡) - 5 consecutive completions under 30s
 5. comeback_kid (🔥) - Success immediately after 3+ consecutive errors
 6. big_spender (💰) - Single invocation over $1.00
 7. penny_pincher (🪙) - 50+ successes at < $0.01 each
 8. marathon (🏃) - 100+ invocations in a single project
-9. polyglot (🌍) - Agent used across 5+ different ticket types
-10. night_owl (🌙) - Invocation between 00:00-05:00 local time
+9. polyglot (🌍) - Agent used across 5+ distinct ticket-key prefixes
+10. night_owl (🌙) - Invocation between 00:00-05:00 host local time
 11. streak_10 (🔥) - 10 consecutive successes
 12. streak_25 (⭐) - 25 consecutive successes
 
@@ -77,14 +77,14 @@ ACHIEVEMENT_NAMES = {
 ACHIEVEMENT_DESCRIPTIONS = {
     "first_blood": "First successful invocation",
     "century_club": "100 successful invocations",
-    "perfect_day": "10+ invocations in one session, 0 errors",
+    "perfect_day": "10+ successes in one session, 0 own errors (checked at session end)",
     "speed_demon": "5 consecutive completions under 30s",
     "comeback_kid": "Success immediately after 3+ consecutive errors",
     "big_spender": "Single invocation over $1.00",
     "penny_pincher": "50+ successes at < $0.01 each",
     "marathon": "100+ invocations in a single project",
-    "polyglot": "Agent used across 5+ different ticket types",
-    "night_owl": "Invocation between 00:00-05:00 local time",
+    "polyglot": "Agent used across 5+ distinct ticket-key prefixes",
+    "night_owl": "Invocation between 00:00-05:00 host local time",
     "streak_10": "10 consecutive successes",
     "streak_25": "25 consecutive successes",
 }

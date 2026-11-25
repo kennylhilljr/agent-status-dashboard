@@ -124,6 +124,40 @@ def test_strengths_kept_when_eviction_drops_agent_below_minimum(collector, monke
     assert state["agents"]["coding"]["strengths"] == strengths
 
 
+def test_newcomer_does_not_make_mature_agent_slow(collector, monkeypatch):
+    """Issue #29: an agent below min_events is not ranked against mature agents."""
+    import strengths_weaknesses
+
+    real_stats = strengths_weaknesses.calculate_rolling_window_stats
+
+    # Pin durations so the test does not depend on wall-clock timing.
+    def pinned_stats(events, agent_name, window_size=20):
+        durations = {"coding": 60.0, "github": 61.0, "linear": 62.0, "slack": 63.0, "newbie": 0.1}
+        pinned = [dict(e, duration_seconds=durations[e["agent_name"]]) for e in events]
+        return real_stats(pinned, agent_name, window_size)
+
+    monkeypatch.setattr(strengths_weaknesses, "calculate_rolling_window_stats", pinned_stats)
+    monkeypatch.setattr(agent_metrics_collector, "calculate_rolling_window_stats", pinned_stats)
+
+    mature = ("coding", "github", "linear", "slack")
+    for i in range(6):
+        for agent in mature:
+            with collector.track_agent(agent, f"AI-{i}", "claude-sonnet-4-5"):
+                pass
+    before = collector.get_state()["agents"]
+    # linear ranks third of four (duration percentile 1/3), so it is not slow
+    assert "slow" not in before["linear"]["weaknesses"]
+
+    with collector.track_agent("newbie", "AI-99", "claude-sonnet-4-5"):
+        pass
+
+    # Ranking the newcomer would push linear to percentile 0.25 and mark it slow
+    after = collector.get_state()["agents"]
+    for agent in mature:
+        assert after[agent]["strengths"] == before[agent]["strengths"]
+        assert after[agent]["weaknesses"] == before[agent]["weaknesses"]
+
+
 def test_unknown_model_logs_warning_once(caplog, monkeypatch):
     monkeypatch.setattr(agent_metrics_collector, "_warned_unpriced_models", set())
     with caplog.at_level(logging.WARNING, logger="agent_metrics_collector"):
