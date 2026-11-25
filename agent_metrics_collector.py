@@ -94,6 +94,8 @@ DEFAULT_PRICING = {"input": 0.003, "output": 0.015}
 _warned_unpriced_models: set[str] = set()
 
 # Artifact prefix + keyword -> (profile counter, XP contribution type or None).
+# The keyword must equal the artifact's status field ("pr:<id>:merged", or the
+# legacy "pr:merged:<id>"); see _artifact_status. It is never a substring match.
 # "file:" artifacts are parsed structurally in _update_agent_profile instead.
 _ARTIFACT_RULES: list[tuple[str, str | None, str, str | None]] = [
     ("commit:", None, "commits_made", "commit"),
@@ -104,6 +106,7 @@ _ARTIFACT_RULES: list[tuple[str, str | None, str, str | None]] = [
     ("message:", None, "messages_sent", None),
     ("review:", None, "reviews_completed", None),
 ]
+_ARTIFACT_STATUSES = frozenset(k for _, k, _, _ in _ARTIFACT_RULES if k is not None)
 
 
 # Newly created files that count as tests_written (20 XP instead of file_created XP)
@@ -176,6 +179,32 @@ def _parse_file_artifact(artifact: str) -> tuple[str, str | None]:
     return rest, None
 
 
+def _artifact_status(artifact: str) -> str | None:
+    """Return the status field of a ``<kind>:<id>:<status>`` artifact.
+
+    The detector format puts the status last (``pr:#7:merged``); the legacy
+    format puts it first (``pr:created:#7``). As with ``file:`` artifacts, a
+    trailing status-shaped field wins and the legacy form is used only
+    otherwise. The status is a whole field, never a substring of the id.
+    Artifacts with fewer than three fields (``commit:abc123``) have none.
+
+    Args:
+        artifact: Artifact string such as ``pr:12:created``
+
+    Returns:
+        The status field, or None when the artifact has none
+    """
+    if artifact.count(":") < 2:
+        return None
+    status = artifact.rsplit(":", 1)[1]
+    if _FILE_ACTION_RE.match(status):
+        return status
+    legacy = artifact.split(":", 2)[1]
+    if legacy in _ARTIFACT_STATUSES:
+        return legacy
+    return None
+
+
 def _normalize_file_path(path: str) -> str:
     """Normalize an artifact path so equivalent spellings compare equal.
 
@@ -226,6 +255,7 @@ class AgentTracker:
         ticket_key: str,
         model_used: str,
         started_at: str,
+        start_time: float | None = None,
     ):
         """Initialize tracker.
 
@@ -236,6 +266,7 @@ class AgentTracker:
             ticket_key: Linear ticket key
             model_used: Model identifier
             started_at: ISO 8601 start timestamp
+            start_time: Epoch seconds (time.time()) when the work began; defaults to now
         """
         self.event_id = event_id
         self.agent_name = agent_name
@@ -243,7 +274,7 @@ class AgentTracker:
         self.ticket_key = ticket_key
         self.model_used = model_used
         self.started_at = started_at
-        self.start_time = time.time()
+        self.start_time = time.time() if start_time is None else start_time
 
         # Accumulated data
         self.input_tokens = 0
@@ -473,8 +504,9 @@ def _update_agent_profile(
                 profile["files_modified"] += 1
                 contribution_xp += calculate_xp_for_contribution_type("file_modified")
             continue
+        status = _artifact_status(artifact)
         for prefix, keyword, counter, contribution in _ARTIFACT_RULES:
-            if artifact.startswith(prefix) and (keyword is None or keyword in artifact):
+            if artifact.startswith(prefix) and (keyword is None or status == keyword):
                 profile[counter] += 1
                 if contribution is not None:
                     contribution_xp += calculate_xp_for_contribution_type(contribution)
@@ -673,7 +705,8 @@ class AgentMetricsCollector:
         agent_name: str,
         ticket_key: str,
         model_used: str,
-        session_id: str | None = None
+        session_id: str | None = None,
+        start_time: float | None = None,
     ):
         """Context manager for tracking an agent delegation.
 
@@ -694,13 +727,17 @@ class AgentMetricsCollector:
             ticket_key: Linear ticket key (e.g., "AI-46")
             model_used: Model identifier (e.g., "claude-sonnet-4-5")
             session_id: Optional session ID (if None, creates a temporary session)
+            start_time: Epoch seconds (time.time()) when the delegation actually began;
+                defaults to now. Use it when the work started before this call.
 
         Yields:
             AgentTracker instance for adding tokens and artifacts
         """
         # Generate event ID and timestamps
         event_id = str(uuid.uuid4())
-        started_at = datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z"
+        if start_time is None:
+            start_time = time.time()
+        started_at = datetime.fromtimestamp(start_time, UTC).replace(tzinfo=None).isoformat() + "Z"
 
         # Use provided session or create temporary one
         temp_session = session_id is None
@@ -715,6 +752,7 @@ class AgentMetricsCollector:
             ticket_key=ticket_key,
             model_used=model_used,
             started_at=started_at,
+            start_time=start_time,
         )
 
         try:

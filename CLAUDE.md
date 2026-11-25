@@ -18,6 +18,7 @@ This is a **multi-agent autonomous software engineering harness** built on the C
 ├── security.py                 # Bash command security hooks (allowlist-based)
 ├── progress.py                 # Progress tracking via .linear_project.json
 ├── prompts.py                  # Prompt template loading utilities
+├── ticket_keys.py              # Ticket key (PROJECT-123) extraction for delegation events
 ├── agents/
 │   ├── __init__.py             # Exports agent definitions and orchestrator
 │   ├── definitions.py          # 13 agent definitions with per-agent model config
