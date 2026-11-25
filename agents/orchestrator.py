@@ -5,7 +5,7 @@ Orchestrator Session Runner
 Runs orchestrated sessions where the main agent delegates to specialized agents.
 """
 
-import re
+import time
 import traceback
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from claude_agent_sdk import (
 from agent import SESSION_CONTINUE, SESSION_ERROR, SessionResult
 from artifact_detector import get_artifact_detector
 from progress import LINEAR_PROJECT_MARKER
+from ticket_keys import extract_ticket_key
 
 
 def extract_token_counts(msg: AssistantMessage) -> tuple[int, int]:
@@ -156,8 +157,9 @@ async def run_orchestrated_session(
         response_text: str = ""
 
         # Track Task tool delegations
-        # Map of tool_use_id -> (agent_name, ticket_key)
-        active_delegations: dict[str, tuple[str, str]] = {}
+        # Map of tool_use_id ->
+        # (agent_name, ticket_key, task_description, input_tokens, output_tokens, start_time)
+        active_delegations: dict[str, tuple[str, str, str, int, int, float]] = {}
 
         async for msg in client.receive_response():
             if isinstance(msg, AssistantMessage):
@@ -180,15 +182,21 @@ async def run_orchestrated_session(
                                 task_description = task_input.get("task", "")
 
                                 # Try to extract ticket key from task description
-                                # Common patterns: "AI-51", "Work on AI-51", etc.
-                                ticket_match = re.search(r'\b(AI-\d+)\b', task_description)
-                                ticket_key = ticket_match.group(1) if ticket_match else "unknown"
+                                # Any PROJECT-123 style key: "AI-51", "Fix HS-12", "OPS2-40", etc.
+                                ticket_key = extract_ticket_key(task_description)
 
                                 # Store delegation info for matching with result
                                 # Include extracted token counts (AI-52: actual from SDK response)
-                                # Note: We only store (agent_name, ticket_key, input_tokens, output_tokens)
-                                # timing is handled automatically by metrics_collector.track_agent()
-                                active_delegations[block.id] = (agent_name, ticket_key, input_tokens, output_tokens)
+                                # Record the start time now: track_agent() only runs when the
+                                # result arrives, so its own clock would measure result handling.
+                                active_delegations[block.id] = (
+                                    agent_name,
+                                    ticket_key,
+                                    task_description,
+                                    input_tokens,
+                                    output_tokens,
+                                    time.time(),
+                                )
 
                                 print(f"   [Delegation tracked: {agent_name} on {ticket_key}]", flush=True)
                             except Exception as e:
@@ -202,7 +210,14 @@ async def run_orchestrated_session(
                         if hasattr(block, 'tool_use_id') and block.tool_use_id in active_delegations:
                             try:
                                 # Unpack stored delegation info including token counts (AI-52)
-                                agent_name, ticket_key, input_tokens, output_tokens = active_delegations[block.tool_use_id]
+                                (
+                                    agent_name,
+                                    ticket_key,
+                                    task_description,
+                                    input_tokens,
+                                    output_tokens,
+                                    start_time,
+                                ) = active_delegations[block.tool_use_id]
 
                                 # Determine if delegation succeeded or failed
                                 is_error = bool(block.is_error) if hasattr(block, 'is_error') and block.is_error else False
@@ -220,7 +235,8 @@ async def run_orchestrated_session(
                                     agent_name=agent_name,
                                     ticket_key=ticket_key,
                                     model_used=model_used,
-                                    session_id=session_id
+                                    session_id=session_id,
+                                    start_time=start_time,
                                 ) as tracker:
                                     # AI-52: Extract real token counts from SDK metadata
                                     # These are actual token counts extracted from SDK response,
