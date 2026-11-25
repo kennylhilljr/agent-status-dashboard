@@ -7,6 +7,7 @@
 """
 
 import asyncio
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -40,7 +41,7 @@ async def _run_one_delegation(
     client = MagicMock()
     client.query = AsyncMock()
 
-    async def receive():
+    async def receive() -> AsyncIterator[AssistantMessage | UserMessage]:
         yield AssistantMessage(
             model="claude-sonnet-4-5",
             content=[
@@ -88,7 +89,7 @@ async def _run_one_delegation(
         ("A-1", "unknown"),
     ],
 )
-def test_extract_ticket_key(text, expected):
+def test_extract_ticket_key(text: object, expected: str) -> None:
     assert extract_ticket_key(text) == expected
 
 
@@ -97,7 +98,9 @@ def test_extract_ticket_key(text, expected):
     ("task_text", "expected"),
     [("Fix HS-12 login", "HS-12"), ("Work on AI-51", "AI-51"), ("Tidy up", "unknown")],
 )
-async def test_orchestrator_records_ticket_key(collector, tmp_path, task_text, expected):
+async def test_orchestrator_records_ticket_key(
+    collector: AgentMetricsCollector, tmp_path: Path, task_text: str, expected: str
+) -> None:
     events = await _run_one_delegation(collector, tmp_path, task_text)
     assert len(events) == 1
     assert events[0]["ticket_key"] == expected
@@ -106,7 +109,7 @@ async def test_orchestrator_records_ticket_key(collector, tmp_path, task_text, e
 # --- delegation start time -------------------------------------------------
 
 
-def test_track_agent_explicit_start_time(collector):
+def test_track_agent_explicit_start_time(collector: AgentMetricsCollector) -> None:
     start = datetime(2026, 2, 14, 2, 30, tzinfo=UTC).timestamp()
     with collector.track_agent("coding", "AI-1", "claude-sonnet-4-5", start_time=start):
         pass
@@ -116,7 +119,7 @@ def test_track_agent_explicit_start_time(collector):
     assert event["duration_seconds"] > 3600
 
 
-def test_track_agent_default_start_time(collector):
+def test_track_agent_default_start_time(collector: AgentMetricsCollector) -> None:
     with collector.track_agent("coding", "AI-1", "claude-sonnet-4-5"):
         pass
     event = collector.get_state()["events"][0]
@@ -125,7 +128,9 @@ def test_track_agent_default_start_time(collector):
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_duration_starts_at_tool_use(collector, tmp_path):
+async def test_orchestrator_duration_starts_at_tool_use(
+    collector: AgentMetricsCollector, tmp_path: Path
+) -> None:
     events = await _run_one_delegation(collector, tmp_path, "Work on AI-51", pause_seconds=0.3)
     assert len(events) == 1
     event = events[0]
@@ -138,7 +143,7 @@ async def test_orchestrator_duration_starts_at_tool_use(collector, tmp_path):
 # --- artifact status field -------------------------------------------------
 
 
-def _counters_after(collector, artifact: str) -> dict:
+def _counters_after(collector: AgentMetricsCollector, artifact: str) -> dict:
     with collector.track_agent("coding", "AI-1", "claude-sonnet-4-5") as tracker:
         tracker.add_artifact(artifact)
     return collector.get_state()["agents"]["coding"]
@@ -162,7 +167,9 @@ def _counters_after(collector, artifact: str) -> dict:
         ("file:tests/created/x.py:modified", {"files_modified": 1, "files_created": 0}),
     ],
 )
-def test_artifact_rules_match_status_field(collector, artifact, expected):
+def test_artifact_rules_match_status_field(
+    collector: AgentMetricsCollector, artifact: str, expected: dict[str, int]
+) -> None:
     profile = _counters_after(collector, artifact)
     for counter, value in expected.items():
         assert profile[counter] == value, counter
