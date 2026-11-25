@@ -72,7 +72,7 @@ class AgentProfile(TypedDict):
     files_modified: int                                     # Coding agent: existing files edited
     lines_added: int                                        # Coding agent: lines of code added
     lines_removed: int                                      # Coding agent: lines of code removed
-    tests_written: int                                      # Coding agent: test files/cases created
+    tests_written: int                                      # Newly created test files (by path pattern)
     issues_created: int                                     # Linear agent: issues created
     issues_completed: int                                   # Linear agent: issues closed
     messages_sent: int                                      # Slack agent: messages posted

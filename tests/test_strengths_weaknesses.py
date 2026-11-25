@@ -517,7 +517,8 @@ class TestPercentileCalculations:
         }
 
         state: DashboardState = {"agents": agents, "events": [event]}
-        percentiles = calculate_agent_percentiles(state, window_size=10)
+        # One event is below the default min_events, so ask for min_events=1
+        percentiles = calculate_agent_percentiles(state, window_size=10, min_events=1)
 
         # Single agent should get 0.5 percentile
         assert percentiles["coding"]["duration_percentile"] == 0.5
@@ -1372,6 +1373,81 @@ class TestIntegration:
         assert "slow" in slow_weaknesses
         assert "expensive" in slow_weaknesses
         assert "high_error_rate" in slow_weaknesses
+
+
+
+def _sw_event(agent, i, duration=60.0, cost=0.02, status="success"):
+    return {
+        "event_id": f"evt-{agent}-{i}",
+        "agent_name": agent,
+        "session_id": "sess-1",
+        "ticket_key": "AI-1",
+        "started_at": "2026-02-14T10:00:00Z",
+        "ended_at": "2026-02-14T10:01:00Z",
+        "duration_seconds": duration,
+        "status": status,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "estimated_cost_usd": cost,
+        "artifacts": [],
+        "error_message": "",
+        "model_used": "claude-sonnet-4-5",
+    }
+
+
+def _sw_state(counts: dict[str, tuple[int, float, float]]) -> DashboardState:
+    """counts: agent -> (event count, duration, cost)."""
+    events = []
+    for agent, (n, duration, cost) in counts.items():
+        events += [_sw_event(agent, i, duration, cost) for i in range(n)]
+    return {
+        "agents": {agent: {"agent_name": agent, "strengths": [], "weaknesses": []} for agent in counts},
+        "events": events,
+    }
+
+
+class TestPercentileMinEvents:
+    """Agents below min_events are excluded from percentile ranking (issue #29)."""
+
+    def test_threshold_boundary(self):
+        state = _sw_state({"a": (5, 60.0, 0.02), "b": (4, 1.0, 0.001)})
+        pct = calculate_agent_percentiles(state, window_size=20)
+        assert set(pct) == {"a"}
+        assert pct["a"]["duration_percentile"] == 0.5
+
+        state = _sw_state({"a": (5, 60.0, 0.02), "b": (5, 1.0, 0.001)})
+        assert set(calculate_agent_percentiles(state, window_size=20)) == {"a", "b"}
+
+    def test_custom_threshold(self):
+        state = _sw_state({"a": (3, 60.0, 0.02), "b": (2, 1.0, 0.001)})
+        assert set(calculate_agent_percentiles(state, window_size=20, min_events=3)) == {"a"}
+        assert set(calculate_agent_percentiles(state, window_size=20, min_events=2)) == {"a", "b"}
+
+    def test_window_smaller_than_threshold(self):
+        state = _sw_state({"a": (10, 60.0, 0.02)})
+        assert calculate_agent_percentiles(state, window_size=3, min_events=5) == {}
+
+    def test_newcomer_does_not_shift_mature_percentiles(self):
+        mature = {"a": (10, 60.0, 0.02), "b": (10, 90.0, 0.03), "c": (10, 120.0, 0.04)}
+        baseline = calculate_agent_percentiles(_sw_state(mature), window_size=20)
+        with_newcomer = calculate_agent_percentiles(
+            _sw_state({**mature, "new": (1, 0.5, 0.0001)}), window_size=20
+        )
+        assert "new" not in with_newcomer
+        assert with_newcomer == baseline
+
+    def test_update_does_not_mark_mature_agent_slow_due_to_newcomer(self):
+        # Two mature agents with similar speed; one very fast newcomer event.
+        state = _sw_state({"a": (10, 61.0, 0.02), "b": (10, 60.0, 0.02), "new": (1, 0.5, 0.0001)})
+        update_agent_strengths_weaknesses(state, window_size=20, min_events=5)
+        baseline = _sw_state({"a": (10, 61.0, 0.02), "b": (10, 60.0, 0.02)})
+        update_agent_strengths_weaknesses(baseline, window_size=20, min_events=5)
+        for agent in ("a", "b"):
+            assert state["agents"][agent]["weaknesses"] == baseline["agents"][agent]["weaknesses"]
+            assert state["agents"][agent]["strengths"] == baseline["agents"][agent]["strengths"]
+        assert state["agents"]["new"]["strengths"] == []
+        assert state["agents"]["new"]["weaknesses"] == []
 
 
 if __name__ == "__main__":

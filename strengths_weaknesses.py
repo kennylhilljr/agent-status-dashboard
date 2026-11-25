@@ -107,13 +107,19 @@ def calculate_rolling_window_stats(
 
 def calculate_agent_percentiles(
     state: DashboardState,
-    window_size: int = 20
+    window_size: int = 20,
+    min_events: int = 5,
 ) -> dict:
     """Calculate percentile rankings for each metric across all agents.
+
+    Only agents with at least ``min_events`` events in their rolling window are
+    ranked, so a newcomer with one unusual event cannot shift mature agents'
+    percentiles. Ineligible agents are left out of the result.
 
     Args:
         state: Dashboard state with all agents and events
         window_size: Size of rolling window for statistics
+        min_events: Minimum events in the window for an agent to be ranked
 
     Returns:
         Dictionary mapping agent_name to their percentile stats:
@@ -139,10 +145,11 @@ def calculate_agent_percentiles(
             window_size
         )
 
-    # Filter out agents with no events
+    # Rank only agents with enough events in their window
+    threshold = max(min_events, 1)
     active_agents = {
         name: stats for name, stats in agent_stats.items()
-        if stats["event_count"] > 0
+        if stats["event_count"] >= threshold
     }
 
     if not active_agents:
@@ -348,7 +355,7 @@ def update_agent_strengths_weaknesses(
         ['fast_execution', 'high_success_rate']
     """
     # Calculate percentiles across all agents
-    percentiles = calculate_agent_percentiles(state, window_size)
+    percentiles = calculate_agent_percentiles(state, window_size, min_events)
 
     # Update each agent
     for agent_name, profile in state["agents"].items():

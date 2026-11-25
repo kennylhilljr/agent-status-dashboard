@@ -7,19 +7,19 @@ easy to test and reason about.
 Achievements (12 total):
 1. first_blood - First successful invocation
 2. century_club - 100 successful invocations
-3. perfect_day - 10+ invocations in one session, 0 errors
+3. perfect_day - 10+ successes in one session, 0 own errors (checked when the session ends)
 4. speed_demon - 5 consecutive completions under 30s
 5. comeback_kid - Success immediately after 3+ consecutive errors
 6. big_spender - Single invocation over $1.00
 7. penny_pincher - 50+ successes at < $0.01 each
 8. marathon - 100+ invocations in a single project
-9. polyglot - Agent used across 5+ different ticket types
-10. night_owl - Invocation between 00:00-05:00 local time
+9. polyglot - Agent used across 5+ distinct ticket-key prefixes (e.g. AI, HS, CTX)
+10. night_owl - Invocation started between 00:00-05:00 in the host's local timezone
 11. streak_10 - 10 consecutive successes
 12. streak_25 - 25 consecutive successes
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from metrics import AgentEvent, AgentProfile
 
@@ -80,15 +80,64 @@ def check_century_club(profile: AgentProfile) -> bool:
     )
 
 
-def check_perfect_day(session_events: list[AgentEvent], agent_name: str, profile: AgentProfile) -> bool:
-    """Check if agent has earned Perfect Day achievement.
+FAILURE_STATUSES = ("error", "timeout", "blocked")
 
-    Awarded for 10+ invocations in one session with 0 errors.
+
+def is_perfect_day_eligible(
+    successes: int, failures: int, session_status: str, profile: AgentProfile
+) -> bool:
+    """Decide Perfect Day from an agent's per-session outcome counts.
+
+    Perfect Day is evaluated once, when the session ends: the agent needs at
+    least 10 successful events in the session, none of its own failures in it,
+    and the session must not have ended with status ``error``. Other agents'
+    failures do not count.
 
     Args:
-        session_events: List of all events in the current session
+        successes: The agent's successful events in the session
+        failures: The agent's failed (error/timeout/blocked) events in the session
+        session_status: Final session status ("complete", "continue" or "error")
+        profile: Agent's performance profile
+
+    Returns:
+        True if achievement should be awarded
+
+    Examples:
+        >>> is_perfect_day_eligible(10, 0, "complete", {"achievements": []})
+        True
+        >>> is_perfect_day_eligible(10, 0, "continue", {"achievements": []})
+        True
+        >>> is_perfect_day_eligible(10, 0, "error", {"achievements": []})
+        False
+        >>> is_perfect_day_eligible(12, 1, "complete", {"achievements": []})
+        False
+        >>> is_perfect_day_eligible(9, 0, "complete", {"achievements": []})
+        False
+    """
+    if "perfect_day" in profile["achievements"]:
+        return False
+    if session_status == "error":
+        return False
+    return successes >= 10 and failures == 0
+
+
+def check_perfect_day(
+    session_events: list[AgentEvent],
+    agent_name: str,
+    profile: AgentProfile,
+    session_status: str = "complete",
+) -> bool:
+    """Check Perfect Day for a finished session from its event list.
+
+    Only call this once the session has ended; ``check_all_achievements`` does
+    not evaluate it per event. The collector uses ``is_perfect_day_eligible``
+    with running counts so the capped event log cannot hide a failure.
+
+    Args:
+        session_events: All events of the finished session
         agent_name: Name of the agent to check
         profile: Agent's performance profile
+        session_status: Final session status
 
     Returns:
         True if achievement should be awarded
@@ -101,20 +150,14 @@ def check_perfect_day(session_events: list[AgentEvent], agent_name: str, profile
         >>> events = [{"agent_name": "coding", "status": "success"} for _ in range(9)]
         >>> check_perfect_day(events, "coding", profile)
         False
-        >>> events = [{"agent_name": "coding", "status": "success" if i < 5 else "error"} for i in range(10)]
+        >>> events = [{"agent_name": "coding", "status": "success" if i < 10 else "error"} for i in range(11)]
         >>> check_perfect_day(events, "coding", profile)
         False
     """
-    if "perfect_day" in profile["achievements"]:
-        return False
-
     agent_events = [e for e in session_events if e["agent_name"] == agent_name]
-
-    if len(agent_events) < 10:
-        return False
-
-    # Check that all events were successful
-    return all(e["status"] == "success" for e in agent_events)
+    successes = sum(1 for e in agent_events if e["status"] == "success")
+    failures = sum(1 for e in agent_events if e["status"] in FAILURE_STATUSES)
+    return is_perfect_day_eligible(successes, failures, session_status, profile)
 
 
 def check_speed_demon(recent_events: list[AgentEvent], profile: AgentProfile) -> bool:
@@ -291,10 +334,39 @@ def check_marathon(profile: AgentProfile) -> bool:
     )
 
 
+def ticket_key_prefix(ticket_key: str) -> str:
+    """Return the project prefix of a ticket key, or "" if it has none.
+
+    Args:
+        ticket_key: Ticket key such as "AI-12"
+
+    Returns:
+        The part before the first "-" (e.g. "AI"), or "" for keys without a
+        nonempty prefix and suffix
+
+    Examples:
+        >>> ticket_key_prefix("AI-12")
+        'AI'
+        >>> ticket_key_prefix("CTX-3-b")
+        'CTX'
+        >>> ticket_key_prefix("AI")
+        ''
+        >>> ticket_key_prefix("-5")
+        ''
+    """
+    if not isinstance(ticket_key, str):
+        return ""
+    prefix, sep, suffix = ticket_key.strip().partition("-")
+    if not sep or not prefix.strip() or not suffix.strip():
+        return ""
+    return prefix.strip()
+
+
 def check_polyglot(all_events: list[AgentEvent], profile: AgentProfile) -> bool:
     """Check if agent has earned Polyglot achievement.
 
-    Awarded when agent is used across 5+ different ticket types.
+    Awarded when the agent has worked tickets with 5+ distinct ticket-key
+    prefixes (the project part before "-", e.g. AI, HS, CTX).
 
     Args:
         all_events: List of all events for this agent
@@ -304,30 +376,29 @@ def check_polyglot(all_events: list[AgentEvent], profile: AgentProfile) -> bool:
         True if achievement should be awarded
 
     Examples:
-        >>> events = [{"ticket_key": f"AI-{i}"} for i in range(5)]
+        >>> events = [{"ticket_key": f"{p}-1"} for p in ["AI", "HS", "CTX", "OPS", "WEB"]]
         >>> profile = {"achievements": []}
         >>> check_polyglot(events, profile)
         True
-        >>> events = [{"ticket_key": f"AI-{i}"} for i in range(4)]
+        >>> events = [{"ticket_key": f"AI-{i}"} for i in range(5)]
         >>> check_polyglot(events, profile)
         False
     """
     if "polyglot" in profile["achievements"]:
         return False
 
-    # Get unique ticket keys (excluding empty strings)
-    unique_tickets = set(
-        e["ticket_key"] for e in all_events
-        if e["ticket_key"] and e["ticket_key"].strip()
-    )
+    prefixes = {ticket_key_prefix(e.get("ticket_key", "")) for e in all_events}
+    prefixes.discard("")
 
-    return len(unique_tickets) >= 5
+    return len(prefixes) >= 5
 
 
 def check_night_owl(event: AgentEvent, profile: AgentProfile) -> bool:
     """Check if agent has earned Night Owl achievement.
 
-    Awarded for an invocation between 00:00-05:00 local time.
+    Awarded for an invocation started between 00:00 (inclusive) and 05:00
+    (exclusive) in the host's local timezone. ``started_at`` is stored in UTC;
+    naive timestamps are treated as UTC and converted to local time.
 
     Args:
         event: The current agent event
@@ -337,26 +408,29 @@ def check_night_owl(event: AgentEvent, profile: AgentProfile) -> bool:
         True if achievement should be awarded
 
     Examples:
-        >>> event = {"started_at": "2026-02-14T02:30:00Z"}
-        >>> profile = {"achievements": []}
-        >>> check_night_owl(event, profile)
+        >>> from datetime import datetime
+        >>> local_2am = datetime(2026, 2, 14, 2, 30).astimezone()
+        >>> check_night_owl({"started_at": local_2am.isoformat()}, {"achievements": []})
         True
-        >>> event = {"started_at": "2026-02-14T12:30:00Z"}
-        >>> check_night_owl(event, profile)
+        >>> local_noon = datetime(2026, 2, 14, 12, 30).astimezone()
+        >>> check_night_owl({"started_at": local_noon.isoformat()}, {"achievements": []})
         False
     """
     if "night_owl" in profile["achievements"]:
         return False
 
     try:
-        # Parse ISO 8601 timestamp
-        timestamp = event["started_at"].rstrip("Z")
+        timestamp = event["started_at"]
+        if timestamp.endswith("Z"):
+            timestamp = timestamp[:-1] + "+00:00"
         dt = datetime.fromisoformat(timestamp)
-
-        # Check if hour is between 0 and 5 (exclusive of 5)
-        return 0 <= dt.hour < 5
-    except (ValueError, AttributeError):
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        local = dt.astimezone()
+    except (ValueError, AttributeError, TypeError, KeyError, OverflowError, OSError):
         return False
+
+    return 0 <= local.hour < 5
 
 
 def check_streak_10(profile: AgentProfile) -> bool:
@@ -418,13 +492,16 @@ def check_all_achievements(
     """Check all achievement conditions and return newly earned achievements.
 
     This is the main function that should be called after each agent invocation
-    to detect and award new achievements.
+    to detect and award new achievements. Perfect Day is not checked here: it
+    depends on the whole session, so it is evaluated when the session ends
+    (see ``is_perfect_day_eligible``).
 
     Args:
         profile: Agent's current performance profile
         current_event: The event that just completed
         all_agent_events: All historical events for this agent
-        session_events: All events in the current session
+        session_events: All events in the current session (unused; kept for
+            backward compatibility)
 
     Returns:
         List of achievement IDs that were just earned (not already in profile)
@@ -449,9 +526,6 @@ def check_all_achievements(
 
     if check_century_club(profile):
         newly_earned.append("century_club")
-
-    if check_perfect_day(session_events, profile["agent_name"], profile):
-        newly_earned.append("perfect_day")
 
     if check_speed_demon(all_agent_events, profile):
         newly_earned.append("speed_demon")
@@ -547,14 +621,14 @@ def get_achievement_description(achievement_id: str) -> str:
     descriptions = {
         "first_blood": "First successful invocation",
         "century_club": "100 successful invocations",
-        "perfect_day": "10+ invocations in one session, 0 errors",
+        "perfect_day": "10+ successes in one session, 0 own errors (checked at session end)",
         "speed_demon": "5 consecutive completions under 30s",
         "comeback_kid": "Success immediately after 3+ consecutive errors",
         "big_spender": "Single invocation over $1.00",
         "penny_pincher": "50+ successes at < $0.01 each",
         "marathon": "100+ invocations in a single project",
-        "polyglot": "Agent used across 5+ different ticket types",
-        "night_owl": "Invocation between 00:00-05:00 local time",
+        "polyglot": "Agent used across 5+ distinct ticket-key prefixes",
+        "night_owl": "Invocation between 00:00-05:00 host local time",
         "streak_10": "10 consecutive successes",
         "streak_25": "25 consecutive successes",
     }

@@ -26,6 +26,8 @@ Usage:
 import contextlib
 import importlib.util
 import logging
+import posixpath
+import re
 import sys
 import time
 import uuid
@@ -72,7 +74,10 @@ def _load_achievement_rules():
     return module
 
 
-check_all_achievements = _load_achievement_rules().check_all_achievements
+_achievement_rules = _load_achievement_rules()
+check_all_achievements = _achievement_rules.check_all_achievements
+is_perfect_day_eligible = _achievement_rules.is_perfect_day_eligible
+_FAILURE_STATUSES = _achievement_rules.FAILURE_STATUSES
 
 # Model pricing (USD per 1000 tokens)
 MODEL_PRICING = {
@@ -88,18 +93,120 @@ DEFAULT_PRICING = {"input": 0.003, "output": 0.015}
 # Models already warned about, so an unpriced model logs once per process
 _warned_unpriced_models: set[str] = set()
 
-# Artifact prefix + keyword -> (profile counter, XP contribution type or None)
+# Artifact prefix + keyword -> (profile counter, XP contribution type or None).
+# "file:" artifacts are parsed structurally in _update_agent_profile instead.
 _ARTIFACT_RULES: list[tuple[str, str | None, str, str | None]] = [
     ("commit:", None, "commits_made", "commit"),
     ("pr:", "created", "prs_created", "pr_created"),
     ("pr:", "merged", "prs_merged", "pr_merged"),
-    ("file:", "created", "files_created", "file_created"),
-    ("file:", "modified", "files_modified", "file_modified"),
     ("issue:", "created", "issues_created", "issue_created"),
     ("issue:", "completed", "issues_completed", "ticket_completed"),
     ("message:", None, "messages_sent", None),
     ("review:", None, "reviews_completed", None),
 ]
+
+
+# Newly created files that count as tests_written (20 XP instead of file_created XP)
+_TEST_FILE_SUFFIXES = (
+    "_test.py",
+    "_test.go",
+    ".test.js",
+    ".test.jsx",
+    ".test.ts",
+    ".test.tsx",
+    ".spec.js",
+    ".spec.jsx",
+    ".spec.ts",
+    ".spec.tsx",
+)
+_TEST_DIRS = {"tests", "test", "__tests__"}
+
+
+def _is_test_file_path(path: str) -> bool:
+    """Return True if ``path`` looks like a test file.
+
+    Matches ``test_*.py``, ``*_test.py``, ``*_test.go``, ``*.test.{js,jsx,ts,tsx}``,
+    ``*.spec.{js,jsx,ts,tsx}``, or any file under a ``tests/``, ``test/`` or
+    ``__tests__/`` directory.
+
+    Args:
+        path: File path from a ``file:<path>:created`` artifact
+
+    Returns:
+        True if the path is a test file
+    """
+    parts = [part for part in path.replace("\\", "/").split("/") if part]
+    if not parts:
+        return False
+    name = parts[-1]
+    if name.startswith("test_") and name.endswith(".py") and len(name) > len("test_.py"):
+        return True
+    if any(name.endswith(suffix) and len(name) > len(suffix) for suffix in _TEST_FILE_SUFFIXES):
+        return True
+    return any(part in _TEST_DIRS for part in parts[:-1])
+
+
+_FILE_ACTION_RE = re.compile(r"^[a-z_]+$")
+
+
+def _parse_file_artifact(artifact: str) -> tuple[str, str | None]:
+    """Split a ``file:`` artifact into (path, action).
+
+    Accepts ``file:<path>:<action>`` (the artifact detector's format),
+    ``file:created:<path>`` / ``file:modified:<path>`` (legacy, action first)
+    and ``file:<path>`` (no action). The action is a whole field, never a
+    substring of the path. A trailing lowercase word field is always taken
+    as the action; the legacy form is used only otherwise.
+
+    Args:
+        artifact: Artifact string starting with ``file:``
+
+    Returns:
+        (path, action); action is None when the artifact has no action field
+    """
+    rest = artifact[len("file:") :]
+    # A trailing action-shaped field wins (detector format)
+    path, sep, action = rest.rpartition(":")
+    if sep and path and _FILE_ACTION_RE.match(action):
+        return path, action
+    # Legacy action-first format
+    head, sep, tail = rest.partition(":")
+    if sep and head in ("created", "modified") and tail:
+        return tail, head
+    return rest, None
+
+
+def _normalize_file_path(path: str) -> str:
+    """Normalize an artifact path so equivalent spellings compare equal.
+
+    Args:
+        path: File path from an artifact
+
+    Returns:
+        Normalized POSIX-style path
+    """
+    return posixpath.normpath(path.replace("\\", "/"))
+
+
+def _created_test_file(artifact: str) -> str | None:
+    """Return the normalized path if ``artifact`` records a newly created test file.
+
+    Args:
+        artifact: Artifact string
+
+    Returns:
+        The test file path, or None if the artifact is not a created test file
+    """
+    if not artifact.startswith("file:"):
+        return None
+    path, action = _parse_file_artifact(artifact)
+    if action != "created" or not path:
+        return None
+    # Normalize first so "tests/../src/app.py" is classified as "src/app.py"
+    normalized = _normalize_file_path(path)
+    if not _is_test_file_path(normalized):
+        return None
+    return normalized
 
 
 class AgentTracker:
@@ -342,9 +449,30 @@ def _update_agent_profile(
     profile["total_cost_usd"] += event["estimated_cost_usd"]
     profile["total_duration_seconds"] += event["duration_seconds"]
 
-    # Update artifact counters based on artifacts (first matching rule wins)
+    # Update artifact counters based on artifacts (first matching rule wins).
+    # A newly created test file counts as tests_written and earns test_written
+    # XP instead of file_created XP; repeats of it within one event count once.
     contribution_xp = 0
+    seen_test_files: set[str] = set()
     for artifact in event["artifacts"]:
+        test_file = _created_test_file(artifact)
+        if test_file is not None:
+            if test_file not in seen_test_files:
+                seen_test_files.add(test_file)
+                profile["files_created"] += 1
+                profile["tests_written"] = profile.get("tests_written", 0) + 1
+                contribution_xp += calculate_xp_for_contribution_type("test_written")
+            continue
+        if artifact.startswith("file:"):
+            # Match the parsed action field, never a substring of the path
+            _, action = _parse_file_artifact(artifact)
+            if action == "created":
+                profile["files_created"] += 1
+                contribution_xp += calculate_xp_for_contribution_type("file_created")
+            elif action == "modified":
+                profile["files_modified"] += 1
+                contribution_xp += calculate_xp_for_contribution_type("file_modified")
+            continue
         for prefix, keyword, counter, contribution in _ARTIFACT_RULES:
             if artifact.startswith(prefix) and (keyword is None or keyword in artifact):
                 profile[counter] += 1
@@ -405,7 +533,7 @@ def _refresh_strengths_weaknesses(
         window_size: Size of the rolling window per agent
         min_events: Minimum retained events needed to re-detect
     """
-    percentiles = calculate_agent_percentiles(state, window_size)
+    percentiles = calculate_agent_percentiles(state, window_size, min_events)
     for agent_name, profile in state["agents"].items():
         stats = calculate_rolling_window_stats(state["events"], agent_name, window_size)
         if stats["event_count"] < min_events:
@@ -475,6 +603,9 @@ class AgentMetricsCollector:
             "tickets_worked": set(),
             "total_tokens": 0,
             "total_cost_usd": 0.0,
+            # agent_name -> {"successes": n, "failures": n}, for Perfect Day.
+            # Counted here so the capped event log cannot hide a failure.
+            "agent_outcomes": {},
         }
 
         return session_id
@@ -513,12 +644,23 @@ class AgentMetricsCollector:
             "tickets_worked": list(session_info["tickets_worked"]),
         }
 
+        agent_outcomes = session_info.get("agent_outcomes", {})
+
         # Add session under one lock. The session number is assigned here,
         # from the persisted counter, so concurrent collectors cannot collide.
+        # Perfect Day depends on the whole session, so it is awarded here.
         def add_session(state: DashboardState) -> None:
             session_summary["session_number"] = state["total_sessions"] + 1
             state["sessions"].append(session_summary)
             state["total_sessions"] += 1
+            for agent_name, outcome in agent_outcomes.items():
+                profile = state["agents"].get(agent_name)
+                if profile is None:
+                    continue
+                if is_perfect_day_eligible(
+                    outcome["successes"], outcome["failures"], status, profile
+                ):
+                    profile["achievements"].append("perfect_day")
 
         self.store.update(add_session)
 
@@ -641,6 +783,13 @@ class AgentMetricsCollector:
             session_info["tickets_worked"].add(event["ticket_key"])
             session_info["total_tokens"] += event["total_tokens"]
             session_info["total_cost_usd"] += event["estimated_cost_usd"]
+            outcome = session_info.setdefault("agent_outcomes", {}).setdefault(
+                event["agent_name"], {"successes": 0, "failures": 0}
+            )
+            if event["status"] == "success":
+                outcome["successes"] += 1
+            elif event["status"] in _FAILURE_STATUSES:
+                outcome["failures"] += 1
 
     def get_state(self) -> DashboardState:
         """Get the current dashboard state.
