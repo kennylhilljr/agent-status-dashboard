@@ -303,21 +303,17 @@ async def test_agent_with_events_browser(server_url, page: Page):
 
 
 async def test_cors_headers_browser(server_url, page: Page):
-    """Test CORS headers are present in browser requests."""
-    # Navigate to metrics endpoint
-    response = await page.goto(f'{server_url}/api/metrics')
-
-    # Check CORS headers
-    headers = response.headers
-    assert 'access-control-allow-origin' in headers
+    """Allowed origins get CORS headers; other origins get none."""
     # The server is localhost-only by default (CORS_ALLOWED_ORIGINS unset), see
     # get_cors_origins() in dashboard_server.py; '*' is opt-in.
-    assert headers['access-control-allow-origin'] in [
-        'http://localhost:3000',
-        'http://localhost:8080',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:8080',
-    ]
+    await page.set_extra_http_headers({'Origin': 'http://localhost:3000'})
+    response = await page.goto(f'{server_url}/api/metrics')
+    assert response.headers['access-control-allow-origin'] == 'http://localhost:3000'
+
+    # A foreign origin must not be granted access (no fallback origin).
+    await page.set_extra_http_headers({'Origin': 'https://evil.example'})
+    response = await page.goto(f'{server_url}/api/metrics')
+    assert 'access-control-allow-origin' not in response.headers
 
 
 if __name__ == '__main__':

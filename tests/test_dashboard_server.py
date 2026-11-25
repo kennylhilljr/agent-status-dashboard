@@ -226,36 +226,52 @@ class TestDashboardServer(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_cors_headers(self):
-        """Test CORS headers are present in responses."""
-        resp = await self.client.request('GET', '/api/metrics')
+        """An allowed origin is echoed back with the CORS headers."""
+        resp = await self.client.request(
+            'GET', '/api/metrics', headers={'Origin': 'http://localhost:3000'}
+        )
         assert resp.status == 200
 
-        # Check CORS headers - should be localhost by default (security-first)
-        assert 'Access-Control-Allow-Origin' in resp.headers
-        # Default allows localhost origins
-        assert resp.headers['Access-Control-Allow-Origin'] in [
-            'http://localhost:3000',
-            'http://localhost:8080',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:8080'
-        ]
+        # Default allows localhost origins (security-first)
+        assert resp.headers['Access-Control-Allow-Origin'] == 'http://localhost:3000'
+        assert resp.headers['Access-Control-Allow-Credentials'] == 'true'
         assert 'Access-Control-Allow-Methods' in resp.headers
         assert 'Access-Control-Allow-Headers' in resp.headers
 
     @unittest_run_loop
+    async def test_cors_disallowed_origin_gets_no_headers(self):
+        """A foreign origin must not get CORS headers (no fallback origin)."""
+        resp = await self.client.request(
+            'GET', '/api/metrics', headers={'Origin': 'https://evil.example'}
+        )
+        assert resp.status == 200
+        assert 'Access-Control-Allow-Origin' not in resp.headers
+        assert 'Access-Control-Allow-Credentials' not in resp.headers
+
+    @unittest_run_loop
+    async def test_cors_no_origin_gets_no_headers(self):
+        """Same-origin and non-browser requests need no CORS headers."""
+        resp = await self.client.request('GET', '/api/metrics')
+        assert resp.status == 200
+        assert 'Access-Control-Allow-Origin' not in resp.headers
+
+    @unittest_run_loop
+    async def test_cors_loopback_origin_on_own_port_allowed(self):
+        """A page served from loopback on the server's own port is allowed."""
+        origin = f'http://127.0.0.1:{self.client.server.port}'
+        resp = await self.client.request('GET', '/api/metrics', headers={'Origin': origin})
+        assert resp.headers['Access-Control-Allow-Origin'] == origin
+
+    @unittest_run_loop
     async def test_cors_preflight_options(self):
         """Test CORS preflight OPTIONS requests are handled."""
-        resp = await self.client.request('OPTIONS', '/api/metrics')
+        resp = await self.client.request(
+            'OPTIONS', '/api/metrics', headers={'Origin': 'http://127.0.0.1:8080'}
+        )
         assert resp.status == 204
 
-        # OPTIONS should have CORS headers - should be localhost by default (security-first)
-        assert 'Access-Control-Allow-Origin' in resp.headers
-        assert resp.headers['Access-Control-Allow-Origin'] in [
-            'http://localhost:3000',
-            'http://localhost:8080',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:8080'
-        ]
+        # OPTIONS should have CORS headers for an allowed origin
+        assert resp.headers['Access-Control-Allow-Origin'] == 'http://127.0.0.1:8080'
 
     @unittest_run_loop
     async def test_empty_metrics(self):
@@ -288,17 +304,12 @@ class TestDashboardServer(AioHTTPTestCase):
 
     @unittest_run_loop
     async def test_health_check_cors(self):
-        """Test health check endpoint has CORS headers."""
-        resp = await self.client.request('GET', '/health')
+        """Test health check endpoint has CORS headers for an allowed origin."""
+        resp = await self.client.request(
+            'GET', '/health', headers={'Origin': 'http://localhost:8080'}
+        )
         assert resp.status == 200
-        # Should be localhost by default (security-first)
-        assert 'Access-Control-Allow-Origin' in resp.headers
-        assert resp.headers['Access-Control-Allow-Origin'] in [
-            'http://localhost:3000',
-            'http://localhost:8080',
-            'http://127.0.0.1:3000',
-            'http://127.0.0.1:8080'
-        ]
+        assert resp.headers['Access-Control-Allow-Origin'] == 'http://localhost:8080'
 
     def tearDown(self):
         """Clean up test files."""
